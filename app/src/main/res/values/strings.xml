@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SmartCheck AI</string>
+    
+    <!-- 状态提示 -->
+    <string name="status_idle">请正视摄像头</string>
+    <string name="status_face_pass">人脸识别通过</string>
+    <string name="status_temp_measuring">正在测温…</string>
+    <string name="status_temp_fail">体温异常，请复测</string>
+    <string name="status_hand_checking">请伸出双手</string>
+    <string name="status_hand_fail">手部检测不合格</string>
+    <string name="status_all_pass">晨检通过</string>
+    
+    <!-- UI 文本 -->
+    <string name="welcome">智能晨检系统</string>
+    <string name="user_name">姓名：%s</string>
+    <string name="temperature">体温：%.1f°C</string>
+    <string name="check_result">检测结果</string>
+    <string name="pass">通过</string>
+    <string name="fail">不合格</string>
+    
+    <!-- 管理界面 -->
+    <string name="admin_title">管理后台</string>
+    <string name="records">晨检记录</string>
+    <string name="settings">系统设置</string>
+</resources>

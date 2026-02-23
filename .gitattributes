@@ -1,0 +1,1 @@
+face-sdk/src/main/assets/fr_2_10.dat filter=lfs diff=lfs merge=lfs -text
