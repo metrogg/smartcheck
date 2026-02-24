@@ -36,6 +36,8 @@ fun DualCameraPreview(
     modifier: Modifier = Modifier,
     cameraType: CameraType = CameraType.FACE,
     preferredCameraId: String? = null,
+    enableAnalysis: Boolean = true,
+    analysisThrottleMs: Long = 200L,
     onFrameAnalyzed: (Bitmap) -> Unit = {},
     onCameraInfo: (cameraId: String, lensFacing: Int) -> Unit = { _, _ -> }
 ) {
@@ -83,34 +85,38 @@ fun DualCameraPreview(
                             it.setSurfaceProvider(previewView.surfaceProvider)
                         }
                     
-                    // 图像分析用例
-                    val imageAnalysis = ImageAnalysis.Builder()
-                        // Keep analysis light: smaller frames + RGBA output avoids JPEG encode/decode.
-                        .setTargetResolution(Size(640, 360))
-                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                        .setTargetRotation(previewView.display?.rotation ?: Surface.ROTATION_0)
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build()
-                        .also {
-                            it.setAnalyzer(executor) { imageProxy ->
-                                val now = System.currentTimeMillis()
-                                // Throttle analysis to reduce CPU load and improve UX latency.
-                                if (now - lastAnalyzeTimeMs < 200L) {
-                                    imageProxy.close()
-                                } else {
-                                    lastAnalyzeTimeMs = now
-                                    processImageProxy(imageProxy, onFrameAnalyzedState)
+                    val useCases = mutableListOf<UseCase>(preview)
+
+                    if (enableAnalysis) {
+                        // 图像分析用例
+                        val imageAnalysis = ImageAnalysis.Builder()
+                            // Keep analysis light: smaller frames + RGBA output avoids JPEG encode/decode.
+                            .setTargetResolution(Size(640, 360))
+                            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                            .setTargetRotation(previewView.display?.rotation ?: Surface.ROTATION_0)
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+                            .also {
+                                it.setAnalyzer(executor) { imageProxy ->
+                                    val now = System.currentTimeMillis()
+                                    // Throttle analysis to reduce CPU load and improve UX latency.
+                                    if (now - lastAnalyzeTimeMs < analysisThrottleMs) {
+                                        imageProxy.close()
+                                    } else {
+                                        lastAnalyzeTimeMs = now
+                                        processImageProxy(imageProxy, onFrameAnalyzedState)
+                                    }
                                 }
                             }
-                        }
+                        useCases.add(imageAnalysis)
+                    }
                     
                     // 绑定生命周期
                     provider.unbindAll()
                     val camera = provider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
-                        preview,
-                        imageAnalysis
+                        *useCases.toTypedArray()
                     )
 
                     val cameraId = try {

@@ -72,11 +72,19 @@ object AppModule {
     @Singleton
     fun provideFaceEngine(
         @ApplicationContext context: Context,
-        seetaFaceEngine: SeetaFaceEngine
+        seetaFaceEngine: SeetaFaceEngine,
+        mockFaceEngine: MockFaceEngine,
     ): FaceEngine {
         Timber.d("Initializing FaceEngine (Seeta)")
-        seetaFaceEngine.init(context)
-        return seetaFaceEngine
+        return try {
+            seetaFaceEngine.init(context)
+            seetaFaceEngine
+        } catch (t: Throwable) {
+            // Keep app usable even if native init crashes.
+            Timber.e(t, "SeetaFaceEngine init crashed; falling back to MockFaceEngine")
+            mockFaceEngine.init(context)
+            mockFaceEngine
+        }
     }
     
     /**

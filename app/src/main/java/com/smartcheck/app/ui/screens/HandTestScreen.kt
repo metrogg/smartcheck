@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.smartcheck.app.viewmodel.MainViewModel
+import com.smartcheck.sdk.ForeignObjectInfo
 import com.smartcheck.sdk.HandInfo
 import timber.log.Timber
 import java.io.File
@@ -417,6 +418,12 @@ fun drawDetections(bitmap: Bitmap, hands: List<HandInfo>): Bitmap {
         strokeWidth = 8f
         textSize = 40f
     }
+
+    val foreignPaint = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+        color = android.graphics.Color.RED
+    }
     
     val textPaint = Paint().apply {
         color = android.graphics.Color.WHITE
@@ -445,6 +452,43 @@ fun drawDetections(bitmap: Bitmap, hands: List<HandInfo>): Bitmap {
         paint.style = Paint.Style.STROKE
         
         canvas.drawText(label, hand.box.left + 10, hand.box.top - 10, textPaint)
+
+        val foreignObjects: List<ForeignObjectInfo> = if (hand.foreignObjects.isNotEmpty()) {
+            hand.foreignObjects
+        } else if (hand.hasForeignObject && hand.keyPoints.size >= 2) {
+            val tl = hand.keyPoints[0]
+            val br = hand.keyPoints[1]
+            listOf(
+                ForeignObjectInfo(
+                    box = RectF(tl.x, tl.y, br.x, br.y),
+                    score = hand.score,
+                    label = hand.label,
+                )
+            )
+        } else {
+            emptyList()
+        }
+
+        if (foreignObjects.isNotEmpty()) {
+            val cropScaleFactor = 1.5f
+            val cx = ((hand.box.left + hand.box.right) / 2f).toInt()
+            val cy = ((hand.box.top + hand.box.bottom) / 2f).toInt()
+            val w = (hand.box.width()).toInt()
+            val h = (hand.box.height()).toInt()
+            val newW = (w * cropScaleFactor).toInt()
+            val newH = (h * cropScaleFactor).toInt()
+            val cropLeft = max(0, cx - newW / 2)
+            val cropTop = max(0, cy - newH / 2)
+
+            foreignObjects.forEach { fo ->
+                val b = fo.box
+                val left = cropLeft + min(b.left, b.right)
+                val top = cropTop + min(b.top, b.bottom)
+                val right = cropLeft + max(b.left, b.right)
+                val bottom = cropTop + max(b.top, b.bottom)
+                canvas.drawRect(left, top, right, bottom, foreignPaint)
+            }
+        }
     }
     
     return mutableBitmap
@@ -482,35 +526,49 @@ fun cropAndScaleHand(bitmap: Bitmap, box: RectF, scaleFactor: Float = 1.5f): Bit
 fun drawForeignObjectOnCrop(cropBitmap: Bitmap, hand: HandInfo): Bitmap {
     val mutableBitmap = cropBitmap.copy(Bitmap.Config.ARGB_8888, true)
     val canvas = Canvas(mutableBitmap)
-    
-    // 读取异物框坐标（相对于裁剪图）
-    val topLeft = hand.keyPoints[0]
-    val bottomRight = hand.keyPoints[1]
-    val foreignBox = RectF(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y)
-    
-    // 画异物框
+
+    val foreignObjects: List<ForeignObjectInfo> = if (hand.foreignObjects.isNotEmpty()) {
+        hand.foreignObjects
+    } else if (hand.hasForeignObject && hand.keyPoints.size >= 2) {
+        val tl = hand.keyPoints[0]
+        val br = hand.keyPoints[1]
+        listOf(
+            ForeignObjectInfo(
+                box = RectF(tl.x, tl.y, br.x, br.y),
+                score = hand.score,
+                label = hand.label,
+            )
+        )
+    } else {
+        emptyList()
+    }
+
     val boxPaint = Paint().apply {
         color = android.graphics.Color.RED
         style = Paint.Style.STROKE
         strokeWidth = 5f
     }
-    canvas.drawRect(foreignBox, boxPaint)
-    
-    // 画异物标签
     val textPaint = Paint().apply {
         color = android.graphics.Color.RED
         textSize = 30f
         style = Paint.Style.FILL
         setShadowLayer(2f, 0f, 0f, android.graphics.Color.BLACK)
     }
-    canvas.drawText(hand.label, topLeft.x, topLeft.y - 10, textPaint)
+
+    foreignObjects.forEach { fo ->
+        val b = fo.box
+        val rect = RectF(min(b.left, b.right), min(b.top, b.bottom), max(b.left, b.right), max(b.top, b.bottom))
+        canvas.drawRect(rect, boxPaint)
+        canvas.drawText("${fo.label} ${"%.2f".format(fo.score)}", rect.left, (rect.top - 10).coerceAtLeast(30f), textPaint)
+    }
     
-    // 画关键点（从索引 2 开始）
+    // 画关键点：新版本 keyPoints 已经是骨架点；旧版本跳过前两个 box 点
     val keypointPaint = Paint().apply {
         color = android.graphics.Color.YELLOW
         style = Paint.Style.FILL
     }
-    for (i in 2 until hand.keyPoints.size) {
+    val startIndex = if (hand.foreignObjects.isEmpty() && hand.hasForeignObject && hand.keyPoints.size > 2) 2 else 0
+    for (i in startIndex until hand.keyPoints.size) {
         val kp = hand.keyPoints[i]
         canvas.drawCircle(kp.x, kp.y, 4f, keypointPaint)
     }

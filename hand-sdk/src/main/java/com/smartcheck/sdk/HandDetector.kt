@@ -8,6 +8,15 @@ import android.graphics.RectF
 import android.util.Log
 
 /**
+ * 单个异物检测结果（坐标相对于 hand crop）
+ */
+data class ForeignObjectInfo(
+    val box: RectF,
+    val score: Float,
+    val label: String,
+)
+
+/**
  * 手部检测结果数据类
  */
 data class HandInfo(
@@ -16,8 +25,27 @@ data class HandInfo(
     val score: Float,         // 置信度
     val keyPoints: List<PointF>, // 21个关键点坐标
     val hasForeignObject: Boolean, // 是否有异物/伤口
-    val label: String         // 标签：Normal, Wound, Foreign Object
-)
+    val label: String,         // 标签：Normal, Wound, Foreign Object
+    val foreignObjects: List<ForeignObjectInfo> = emptyList(),
+) {
+    // Backward-compatible constructor for older JNI signature.
+    constructor(
+        id: Int,
+        box: RectF,
+        score: Float,
+        keyPoints: List<PointF>,
+        hasForeignObject: Boolean,
+        label: String,
+    ) : this(
+        id = id,
+        box = box,
+        score = score,
+        keyPoints = keyPoints,
+        hasForeignObject = hasForeignObject,
+        label = label,
+        foreignObjects = emptyList(),
+    )
+}
 
 /**
  * 手部异物检测 SDK

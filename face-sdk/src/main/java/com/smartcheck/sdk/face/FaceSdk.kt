@@ -20,6 +20,7 @@ object FaceSdk {
     private const val FR_MODEL_MD5 = "2D637AAD8B1B7AE62154A877EC291C99"
 
     private var isInitialized = false
+    private var lastInitError: String? = null
 
     init {
         try {
@@ -121,6 +122,7 @@ object FaceSdk {
             Log.w(TAG, "Already initialized")
             return 0
         }
+        lastInitError = null
 
         try {
             context.assets.open(FD_MODEL_NAME).close()
@@ -151,7 +153,13 @@ object FaceSdk {
             Log.e(TAG, "Failed to compute model MD5", e)
         }
 
-        val ret = nativeInit(fdPath, lmPath, frPath)
+        val ret = try {
+            nativeInit(fdPath, lmPath, frPath)
+        } catch (t: Throwable) {
+            lastInitError = "nativeInit threw ${t::class.java.simpleName}: ${t.message}"
+            Log.e(TAG, "nativeInit threw", t)
+            -99
+        }
         if (ret == 0) {
             isInitialized = true
             Log.i(TAG, "FaceSdk initialized successfully")
@@ -160,6 +168,8 @@ object FaceSdk {
         }
         return ret
     }
+
+    fun getLastInitError(): String? = lastInitError
 
     fun detect(bitmap: Bitmap): List<FaceInfo> {
         if (!isInitialized) {

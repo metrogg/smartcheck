@@ -10,6 +10,7 @@ import com.smartcheck.sdk.face.FaceSdk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
@@ -27,6 +28,11 @@ class SeetaFaceEngine @Inject constructor(
     override fun init(context: Context) {
         val ret = FaceSdk.init(context)
         isInitialized = ret == 0
+        if (!isInitialized) {
+            Timber.e("SeetaFaceEngine init failed: ret=%d err=%s", ret, FaceSdk.getLastInitError())
+        } else {
+            Timber.i("SeetaFaceEngine init ok")
+        }
     }
 
     override suspend fun detectAndRecognize(frame: Bitmap): FaceResult? {

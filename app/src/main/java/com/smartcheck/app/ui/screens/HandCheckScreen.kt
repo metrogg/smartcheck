@@ -35,12 +35,14 @@ import androidx.camera.core.CameraSelector
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import com.smartcheck.app.ui.components.CameraType
 import com.smartcheck.app.ui.components.DualCameraPreview
 import com.smartcheck.app.ui.components.HandOverlay
 import com.smartcheck.app.viewmodel.MainViewModel
 import com.smartcheck.sdk.HandDetector
+import com.smartcheck.sdk.ForeignObjectInfo
 import com.smartcheck.sdk.HandInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -82,6 +84,7 @@ fun HandCheckScreen(
         // Keep the two modes isolated so UI state stays crisp.
         if (detectMode == DetectMode.IMAGE) {
             viewModel.clearHandDetection()
+            latestFrame = null
         } else {
             isStillProcessing = false
             latestFrame = null
@@ -120,6 +123,11 @@ fun HandCheckScreen(
             style = android.graphics.Paint.Style.STROKE
             strokeWidth = 6f
         }
+        val foreignPaint = android.graphics.Paint().apply {
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = 5f
+            color = android.graphics.Color.RED
+        }
         val textPaint = android.graphics.Paint().apply {
             color = android.graphics.Color.WHITE
             textSize = 36f
@@ -132,6 +140,45 @@ fun HandCheckScreen(
             boxPaint.color = color
             canvas.drawRect(hand.box, boxPaint)
             canvas.drawText(hand.label, hand.box.left, (hand.box.top - 10f).coerceAtLeast(40f), textPaint)
+
+            val foreignObjects: List<ForeignObjectInfo> = if (hand.foreignObjects.isNotEmpty()) {
+                hand.foreignObjects
+            } else if (hand.hasForeignObject && hand.keyPoints.size >= 2) {
+                // Legacy fallback: 1 box stored in keyPoints[0..1]
+                val tl = hand.keyPoints[0]
+                val br = hand.keyPoints[1]
+                listOf(
+                    ForeignObjectInfo(
+                        box = android.graphics.RectF(tl.x, tl.y, br.x, br.y),
+                        score = hand.score,
+                        label = hand.label,
+                    )
+                )
+            } else {
+                emptyList()
+            }
+
+            // Draw foreign boxes (relative to 1.5x crop) onto original image.
+            if (foreignObjects.isNotEmpty()) {
+                val cropScaleFactor = 1.5f
+                val cx = ((hand.box.left + hand.box.right) / 2f).toInt()
+                val cy = ((hand.box.top + hand.box.bottom) / 2f).toInt()
+                val w = (hand.box.width()).toInt()
+                val h = (hand.box.height()).toInt()
+                val newW = (w * cropScaleFactor).toInt()
+                val newH = (h * cropScaleFactor).toInt()
+                val cropLeft = (cx - newW / 2).coerceAtLeast(0)
+                val cropTop = (cy - newH / 2).coerceAtLeast(0)
+
+                foreignObjects.forEach { fo ->
+                    val b = fo.box
+                    val left = cropLeft + minOf(b.left, b.right)
+                    val top = cropTop + minOf(b.top, b.bottom)
+                    val right = cropLeft + maxOf(b.left, b.right)
+                    val bottom = cropTop + maxOf(b.top, b.bottom)
+                    canvas.drawRect(left, top, right, bottom, foreignPaint)
+                }
+            }
         }
 
         return mutableBitmap
@@ -261,69 +308,91 @@ fun HandCheckScreen(
                             .background(Color.Black),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Keep preview aspect ratio without making it look "small" on wide/tall cards.
-                        BoxWithConstraints(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val targetAspect = 16f / 9f
-                            val containerAspect = if (maxHeight == 0.dp) targetAspect else (maxWidth / maxHeight)
-
-                            val previewModifier = if (containerAspect > targetAspect) {
-                                Modifier
-                                    .fillMaxHeight()
-                                    .aspectRatio(targetAspect)
-                            } else {
-                                Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(targetAspect)
-                            }
-
-                            Box(modifier = previewModifier) {
-                        if (cameraPermissionState.status.isGranted) {
-                            DualCameraPreview(
+                        if (detectMode == DetectMode.REALTIME) {
+                            // Keep preview aspect ratio without making it look "small" on wide/tall cards.
+                            BoxWithConstraints(
                                 modifier = Modifier.fillMaxSize(),
-                                cameraType = currentCameraType,
-                                preferredCameraId = preferredCameraId,
-                                 onFrameAnalyzed = { bitmap ->
-                                     lastFrameWidth = bitmap.width
-                                     lastFrameHeight = bitmap.height
-                                     latestFrame = if (detectMode == DetectMode.IMAGE) bitmap else null
-                                     if (detectMode == DetectMode.REALTIME) {
-                                         viewModel.processHandDetection(bitmap)
-                                     }
-                                 },
-                                onCameraInfo = { cameraId, lensFacingValue ->
-                                    cameraInfo = cameraId to lensFacingValue
-                                    isCameraRunning = true
-                                    cameraLensFacing = lensFacingValue
-                                }
-                            )
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val targetAspect = 16f / 9f
+                                val containerAspect = if (maxHeight == 0.dp) targetAspect else (maxWidth / maxHeight)
 
-                            if (detectMode == DetectMode.REALTIME) {
-                                HandOverlay(
-                                    handInfos = handInfos,
-                                    frameWidth = lastFrameWidth,
-                                    frameHeight = lastFrameHeight,
-                                    contentScale = ContentScale.Fit,
-                                    mirrorX = cameraLensFacing == CameraSelector.LENS_FACING_FRONT,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                                val previewModifier = if (containerAspect > targetAspect) {
+                                    Modifier
+                                        .fillMaxHeight()
+                                        .aspectRatio(targetAspect)
+                                } else {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(targetAspect)
+                                }
+
+                                Box(modifier = previewModifier) {
+                                    if (cameraPermissionState.status.isGranted) {
+                                        DualCameraPreview(
+                                            modifier = Modifier.fillMaxSize(),
+                                            cameraType = currentCameraType,
+                                            preferredCameraId = preferredCameraId,
+                                            enableAnalysis = true,
+                                            analysisThrottleMs = 200L,
+                                            onFrameAnalyzed = { bitmap ->
+                                                lastFrameWidth = bitmap.width
+                                                lastFrameHeight = bitmap.height
+                                                if (detectMode == DetectMode.REALTIME) {
+                                                    viewModel.processHandDetection(bitmap)
+                                                }
+                                            },
+                                            onCameraInfo = { cameraId, lensFacingValue ->
+                                                cameraInfo = cameraId to lensFacingValue
+                                                isCameraRunning = true
+                                                cameraLensFacing = lensFacingValue
+                                            }
+                                        )
+
+                                        HandOverlay(
+                                            handInfos = handInfos,
+                                            frameWidth = lastFrameWidth,
+                                            frameHeight = lastFrameHeight,
+                                            contentScale = ContentScale.Fit,
+                                            mirrorX = cameraLensFacing == CameraSelector.LENS_FACING_FRONT,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = "需要相机权限",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Button(onClick = { cameraPermissionState.launchPermissionRequest() }) {
+                                                Text("授予权限")
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         } else {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "需要相机权限",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
+                            if (stillOriginal != null) {
+                                Image(
+                                    bitmap = (stillAnnotated ?: stillOriginal!!).asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { cameraPermissionState.launchPermissionRequest() }) {
-                                    Text("授予权限")
+                            } else {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "拍照或选择图片后在这里显示",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "右侧点击 '拍照检测' / '图片检测'",
+                                        color = Color.White.copy(alpha = 0.8f)
+                                    )
                                 }
-                            }
-                        }
-
                             }
                         }
 
@@ -340,24 +409,6 @@ fun HandCheckScreen(
                                 color = Color.White
                             )
                         }
-                    }
-                }
-            }
-
-            @Composable
-            fun StillResultImage(modifier: Modifier) {
-                if (stillOriginal == null) return
-                Card(
-                    modifier = modifier,
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Image(
-                            bitmap = (stillAnnotated ?: stillOriginal!!).asImageBitmap(),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
                     }
                 }
             }
@@ -411,9 +462,9 @@ fun HandCheckScreen(
                                 }
 
                                  if (detectMode == DetectMode.IMAGE) {
-                                    Button(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        enabled = latestFrame != null && !isStillProcessing,
+                                     Button(
+                                         modifier = Modifier.fillMaxWidth(),
+                                         enabled = latestFrame != null && !isStillProcessing,
                                          onClick = {
                                              val frame = latestFrame ?: return@Button
                                              val snapshot = scaleBitmapDown(frame.copy(Bitmap.Config.ARGB_8888, false), 1280)
@@ -467,6 +518,12 @@ fun HandCheckScreen(
                     if (detectMode == DetectMode.REALTIME) {
                         add {
                             val hasIssue = handInfos.any { it.hasForeignObject }
+                            val foreignList = handInfos.flatMap { it.foreignObjects }
+                            val foreignCount = foreignList.size
+                            val foreignSummary = foreignList.groupingBy { it.label }.eachCount()
+                                .entries
+                                .sortedByDescending { it.value }
+                                .joinToString { "${it.key} x${it.value}" }
                             val statusText = when {
                                 !isCameraRunning -> "等待相机..."
                                 handInfos.isEmpty() -> "未检测到手部"
@@ -482,11 +539,23 @@ fun HandCheckScreen(
                                     Text("实时结果", fontWeight = FontWeight.Bold)
                                     Text(statusText, fontWeight = FontWeight.Bold)
                                     Text("检测到手: ${handInfos.size}")
+                                    if (foreignCount > 0) {
+                                        Text("异物数: $foreignCount")
+                                        if (foreignSummary.isNotBlank()) {
+                                            Text("类别: $foreignSummary", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
                                 }
                             }
                         }
                     } else {
                         add {
+                            val foreignList = stillHandInfos.flatMap { it.foreignObjects }
+                            val foreignCount = foreignList.size
+                            val foreignSummary = foreignList.groupingBy { it.label }.eachCount()
+                                .entries
+                                .sortedByDescending { it.value }
+                                .joinToString { "${it.key} x${it.value}" }
                             ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                                 Column(
                                     modifier = Modifier.padding(12.dp),
@@ -511,6 +580,12 @@ fun HandCheckScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text("检测到手: ${stillHandInfos.size}")
+                                    if (foreignCount > 0) {
+                                        Text("异物数: $foreignCount")
+                                        if (foreignSummary.isNotBlank()) {
+                                            Text("类别: $foreignSummary", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -539,16 +614,6 @@ fun HandCheckScreen(
                         )
                     }
 
-                    if (detectMode == DetectMode.IMAGE && stillOriginal != null) {
-                        item {
-                            StillResultImage(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 180.dp, max = 320.dp)
-                            )
-                        }
-                    }
-
                     item {
                         PanelContent(modifier = Modifier.fillMaxWidth())
                     }
@@ -570,14 +635,6 @@ fun HandCheckScreen(
                                 .weight(1f)
                                 .heightIn(min = 360.dp)
                         )
-
-                        if (detectMode == DetectMode.IMAGE && stillOriginal != null) {
-                            StillResultImage(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 200.dp, max = 320.dp)
-                            )
-                        }
                     }
 
                     PanelContent(
@@ -586,6 +643,28 @@ fun HandCheckScreen(
                             .widthIn(min = 360.dp, max = 420.dp)
                     )
                 }
+            }
+
+            // In IMAGE mode we still need a live frame source for "拍照检测",
+            // but we don't want to show the live preview. Keep it hidden.
+            if (detectMode == DetectMode.IMAGE && cameraPermissionState.status.isGranted) {
+                DualCameraPreview(
+                    modifier = Modifier
+                        .size(1.dp)
+                        .alpha(0f),
+                    cameraType = currentCameraType,
+                    preferredCameraId = preferredCameraId,
+                    enableAnalysis = true,
+                    analysisThrottleMs = 500L,
+                    onFrameAnalyzed = { bitmap ->
+                        latestFrame = bitmap
+                    },
+                    onCameraInfo = { cameraId, lensFacingValue ->
+                        cameraInfo = cameraId to lensFacingValue
+                        isCameraRunning = true
+                        cameraLensFacing = lensFacingValue
+                    }
+                )
             }
         }
     }

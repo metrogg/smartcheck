@@ -41,6 +41,49 @@ static SeetaModelSetting g_fd_setting{SEETA_DEVICE_CPU, 0, nullptr};
 static SeetaModelSetting g_lm_setting{SEETA_DEVICE_CPU, 0, nullptr};
 static SeetaModelSetting g_fr_setting{SEETA_DEVICE_CPU, 0, nullptr};
 
+static long long checked_stat_size_or_throw(const char *path, const char *tag) {
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        LOGE("nativeInit stat(%s) failed path=%s errno=%d(%s)", tag, path, errno, strerror(errno));
+        throw std::runtime_error("model not accessible");
+    }
+    const auto size = static_cast<long long>(st.st_size);
+    LOGI("nativeInit %s model size=%lld path=%s", tag, size, path);
+    if (size <= 0) {
+        LOGE("nativeInit %s model size invalid: %lld path=%s", tag, size, path);
+        throw std::runtime_error("model size invalid");
+    }
+    return size;
+}
+
+static void validate_probe_size_or_throw(
+    const char *path,
+    const char *tag,
+    long long stat_size,
+    long long probe_size,
+    long long ifs_size) {
+    if (probe_size <= 0 || ifs_size <= 0) {
+        LOGE(
+            "nativeInit %s probe size invalid. stat=%lld probe=%lld ifstream=%lld path=%s",
+            tag,
+            stat_size,
+            probe_size,
+            ifs_size,
+            path);
+        throw std::runtime_error("model probe size invalid");
+    }
+    if (probe_size != stat_size || ifs_size != stat_size) {
+        LOGE(
+            "nativeInit %s size mismatch. stat=%lld probe=%lld ifstream=%lld path=%s",
+            tag,
+            stat_size,
+            probe_size,
+            ifs_size,
+            path);
+        throw std::runtime_error("model size mismatch");
+    }
+}
+
 static bool probe_file_seek(const char *path, long long *out_size, int *out_errno) {
     if (out_size) *out_size = -1;
     if (out_errno) *out_errno = 0;
@@ -176,12 +219,7 @@ Java_com_smartcheck_sdk_face_FaceSdk_nativeInit(
     g_landmark_num = 0;
 
     try {
-        struct stat st;
-        if (stat(fdPath, &st) != 0) {
-            LOGE("nativeInit stat(fd) failed path=%s errno=%d(%s)", fdPath, errno, strerror(errno));
-            throw std::runtime_error("fd model not accessible");
-        }
-        LOGI("nativeInit fd model size=%lld path=%s", static_cast<long long>(st.st_size), fdPath);
+        const long long fd_stat_size = checked_stat_size_or_throw(fdPath, "fd");
 
         long long probe_size = -1;
         int probe_errno = 0;
@@ -198,11 +236,9 @@ Java_com_smartcheck_sdk_face_FaceSdk_nativeInit(
             LOGI("nativeInit ifstream(fd) ok size=%lld path=%s", ifs_size, fdPath);
         }
 
-        if (stat(lmPath, &st) != 0) {
-            LOGE("nativeInit stat(lm) failed path=%s errno=%d(%s)", lmPath, errno, strerror(errno));
-            throw std::runtime_error("lm model not accessible");
-        }
-        LOGI("nativeInit lm model size=%lld path=%s", static_cast<long long>(st.st_size), lmPath);
+        validate_probe_size_or_throw(fdPath, "fd", fd_stat_size, probe_size, ifs_size);
+
+        const long long lm_stat_size = checked_stat_size_or_throw(lmPath, "lm");
 
         probe_size = -1;
         probe_errno = 0;
@@ -219,11 +255,9 @@ Java_com_smartcheck_sdk_face_FaceSdk_nativeInit(
             LOGI("nativeInit ifstream(lm) ok size=%lld path=%s", ifs_size, lmPath);
         }
 
-        if (stat(frPath, &st) != 0) {
-            LOGE("nativeInit stat(fr) failed path=%s errno=%d(%s)", frPath, errno, strerror(errno));
-            throw std::runtime_error("fr model not accessible");
-        }
-        LOGI("nativeInit fr model size=%lld path=%s", static_cast<long long>(st.st_size), frPath);
+        validate_probe_size_or_throw(lmPath, "lm", lm_stat_size, probe_size, ifs_size);
+
+        const long long fr_stat_size = checked_stat_size_or_throw(frPath, "fr");
 
         probe_size = -1;
         probe_errno = 0;
@@ -239,6 +273,8 @@ Java_com_smartcheck_sdk_face_FaceSdk_nativeInit(
         } else {
             LOGI("nativeInit ifstream(fr) ok size=%lld path=%s", ifs_size, frPath);
         }
+
+        validate_probe_size_or_throw(frPath, "fr", fr_stat_size, probe_size, ifs_size);
 
         g_fd_model_path = fdPath;
         g_lm_model_path = lmPath;
@@ -261,8 +297,28 @@ Java_com_smartcheck_sdk_face_FaceSdk_nativeInit(
         g_fr_setting.id = 0;
         g_fr_setting.model = g_fr_models;
 
-        LOGI("nativeInit creating FaceDetector...");
-        g_face_detector = std::make_unique<seeta::FaceDetector>(g_fd_setting);
+        LOGI(
+            "nativeInit settings: fd(device=%d id=%d model0=%s) lm(device=%d id=%d model0=%s) fr(device=%d id=%d model0=%s)",
+            static_cast<int>(g_fd_setting.device),
+            g_fd_setting.id,
+            g_fd_setting.model && g_fd_setting.model[0] ? g_fd_setting.model[0] : "(null)",
+            static_cast<int>(g_lm_setting.device),
+            g_lm_setting.id,
+            g_lm_setting.model && g_lm_setting.model[0] ? g_lm_setting.model[0] : "(null)",
+            static_cast<int>(g_fr_setting.device),
+            g_fr_setting.id,
+            g_fr_setting.model && g_fr_setting.model[0] ? g_fr_setting.model[0] : "(null)");
+
+        // Some vendor builds show unstable allocator behavior inside FaceDetector ctor when core size
+        // is not explicitly specified. Prefer explicit core size to avoid internal size underflow.
+        const int core_width = 640;
+        const int core_height = 480;
+        LOGI(
+            "nativeInit creating FaceDetector... core=%dx%d sizeof(SeetaModelSetting)=%zu",
+            core_width,
+            core_height,
+            sizeof(SeetaModelSetting));
+        g_face_detector = std::make_unique<seeta::FaceDetector>(g_fd_setting, core_width, core_height);
         LOGI("nativeInit FaceDetector ok");
 
         LOGI("nativeInit creating FaceLandmarker...");

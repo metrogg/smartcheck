@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import com.smartcheck.sdk.ForeignObjectInfo
 import com.smartcheck.sdk.HandInfo
 import kotlin.math.max
 import kotlin.math.min
@@ -122,14 +123,29 @@ fun HandOverlay(
             val cropLeftF = cropLeft.toFloat()
             val cropTopF = cropTop.toFloat()
 
-            if (hand.hasForeignObject && hand.keyPoints.size >= 2) {
+            val foreignObjects: List<ForeignObjectInfo> = if (hand.foreignObjects.isNotEmpty()) {
+                hand.foreignObjects
+            } else if (hand.hasForeignObject && hand.keyPoints.size >= 2) {
+                // Backward compatibility: legacy JNI encodes 1 foreign box in keyPoints[0..1].
                 val tl = hand.keyPoints[0]
                 val br = hand.keyPoints[1]
+                listOf(
+                    ForeignObjectInfo(
+                        box = android.graphics.RectF(tl.x, tl.y, br.x, br.y),
+                        score = hand.score,
+                        label = hand.label,
+                    )
+                )
+            } else {
+                emptyList()
+            }
 
-                val foreignLeftRaw = cropLeftF + min(tl.x, br.x)
-                val foreignRightRaw = cropLeftF + max(tl.x, br.x)
-                val foreignTopRaw = cropTopF + min(tl.y, br.y)
-                val foreignBottomRaw = cropTopF + max(tl.y, br.y)
+            foreignObjects.forEach { fo ->
+                val b = fo.box
+                val foreignLeftRaw = cropLeftF + min(b.left, b.right)
+                val foreignRightRaw = cropLeftF + max(b.left, b.right)
+                val foreignTopRaw = cropTopF + min(b.top, b.bottom)
+                val foreignBottomRaw = cropTopF + max(b.top, b.bottom)
 
                 val fx1 = mapX(foreignLeftRaw)
                 val fx2 = mapX(foreignRightRaw)
@@ -146,7 +162,9 @@ fun HandOverlay(
                 )
             }
 
-            val skeletonPoints = if (hand.hasForeignObject && hand.keyPoints.size > 2) {
+            // For the new JNI path keyPoints is already skeleton keypoints.
+            // For the legacy path (foreign box packed into first two points) skip them.
+            val skeletonPoints = if (hand.foreignObjects.isEmpty() && hand.hasForeignObject && hand.keyPoints.size > 2) {
                 hand.keyPoints.subList(2, hand.keyPoints.size)
             } else {
                 hand.keyPoints

@@ -122,7 +122,11 @@ Java_com_smartcheck_sdk_HandDetector_nativeDetect(
     }
     
     // 3. 对每个手部框做异物检测
-    std::vector<HandResult> results;
+    struct HandJniResult {
+        HandResult hand;
+        ForeignResult foreign;
+    };
+    std::vector<HandJniResult> results;
     for (size_t i = 0; i < num_hands; i++) {
         const auto& hand_box = hand_boxes[i];
         
@@ -137,37 +141,27 @@ Java_com_smartcheck_sdk_HandDetector_nativeDetect(
         
         // 异物检测
         ForeignResult foreign_result = g_foreign_engine->detect(hand_crop);
-        
-        if (!foreign_result.boxes.empty()) {
-            for (size_t j = 0; j < foreign_result.boxes.size(); j++) {
-                HandResult result;
-                result.id = static_cast<int>(i * 100 + j);
-                result.box = hand_box;  // 始终使用手部框（全图显示）
-                result.hasForeignObject = true;
-                result.label = (j < foreign_result.class_names.size()) ? foreign_result.class_names[j] : foreign_result.class_name;
-                result.score = foreign_result.boxes[j].score;
 
-                // 前两个点存储异物框坐标（相对于裁剪图）
-                result.keyPoints.push_back({foreign_result.boxes[j].x1, foreign_result.boxes[j].y1});
-                result.keyPoints.push_back({foreign_result.boxes[j].x2, foreign_result.boxes[j].y2});
-
-                // 后续添加真正的关键点（也是相对于裁剪图）
-                for (const auto& kp : foreign_result.keypoints) {
-                    result.keyPoints.push_back({kp.x, kp.y});
-                }
-
-                results.push_back(result);
-            }
+        HandResult hand_result;
+        hand_result.id = static_cast<int>(i);
+        hand_result.box = hand_box;  // 始终使用手部框（全图显示）
+        hand_result.hasForeignObject = !foreign_result.boxes.empty();
+        if (!foreign_result.boxes.empty() && !foreign_result.class_names.empty() && !foreign_result.scores.empty()) {
+            // Overall label/score: top-1 foreign object
+            hand_result.label = foreign_result.class_names[0];
+            hand_result.score = foreign_result.scores[0];
         } else {
-            HandResult result;
-            result.id = static_cast<int>(i);
-            result.box = hand_box;  // 始终使用手部框（全图显示）
-            result.hasForeignObject = false;
-            result.label = foreign_result.class_name;
-            result.score = hand_box.score;
-            result.keyPoints = foreign_result.keypoints;
-            results.push_back(result);
+            hand_result.label = foreign_result.class_name;
+            hand_result.score = hand_box.score;
         }
+
+        // Keypoints only (relative to crop)
+        hand_result.keyPoints = foreign_result.keypoints;
+
+        HandJniResult merged;
+        merged.hand = hand_result;
+        merged.foreign = std::move(foreign_result);
+        results.push_back(std::move(merged));
     }
     
     AndroidBitmap_unlockPixels(env, bitmap);
@@ -175,9 +169,9 @@ Java_com_smartcheck_sdk_HandDetector_nativeDetect(
     // 4. 转换成 Java HandInfo 数组
     jclass handInfoClass = env->FindClass("com/smartcheck/sdk/HandInfo");
     jmethodID constructor = env->GetMethodID(
-        handInfoClass, 
-        "<init>", 
-        "(ILandroid/graphics/RectF;FLjava/util/List;ZLjava/lang/String;)V"
+        handInfoClass,
+        "<init>",
+        "(ILandroid/graphics/RectF;FLjava/util/List;ZLjava/lang/String;Ljava/util/List;)V"
     );
     
     jobjectArray resultArray = env->NewObjectArray(
@@ -191,13 +185,25 @@ Java_com_smartcheck_sdk_HandDetector_nativeDetect(
     
     jclass pointFClass = env->FindClass("android/graphics/PointF");
     jmethodID pointFConstructor = env->GetMethodID(pointFClass, "<init>", "(FF)V");
-    
+
     jclass arrayListClass = env->FindClass("java/util/ArrayList");
     jmethodID arrayListConstructor = env->GetMethodID(arrayListClass, "<init>", "()V");
     jmethodID arrayListAdd = env->GetMethodID(arrayListClass, "add", "(Ljava/lang/Object;)Z");
+
+    // ForeignObjectInfo
+    jclass foreignInfoClass = env->FindClass("com/smartcheck/sdk/ForeignObjectInfo");
+    jmethodID foreignInfoCtor = nullptr;
+    if (foreignInfoClass) {
+        foreignInfoCtor = env->GetMethodID(
+            foreignInfoClass,
+            "<init>",
+            "(Landroid/graphics/RectF;FLjava/lang/String;)V"
+        );
+    }
     
     for (size_t i = 0; i < results.size(); i++) {
-        const auto& result = results[i];
+        const auto& result = results[i].hand;
+        const auto& foreign = results[i].foreign;
         
         // 创建 RectF
         jobject rectF = env->NewObject(
@@ -216,6 +222,36 @@ Java_com_smartcheck_sdk_HandDetector_nativeDetect(
             env->CallBooleanMethod(keyPointsList, arrayListAdd, pointF);
             env->DeleteLocalRef(pointF);
         }
+
+        // 创建 foreignObjects List
+        jobject foreignObjectsList = env->NewObject(arrayListClass, arrayListConstructor);
+        if (foreignInfoClass && foreignInfoCtor) {
+            const size_t n = std::min(foreign.boxes.size(), foreign.class_names.size());
+            for (size_t j = 0; j < n; j++) {
+                const auto& b = foreign.boxes[j];
+                const float score = (j < foreign.scores.size()) ? foreign.scores[j] : b.score;
+                jobject fRect = env->NewObject(
+                    rectFClass,
+                    rectFConstructor,
+                    b.x1,
+                    b.y1,
+                    b.x2,
+                    b.y2
+                );
+                jstring fLabel = env->NewStringUTF(foreign.class_names[j].c_str());
+                jobject fInfo = env->NewObject(
+                    foreignInfoClass,
+                    foreignInfoCtor,
+                    fRect,
+                    score,
+                    fLabel
+                );
+                env->CallBooleanMethod(foreignObjectsList, arrayListAdd, fInfo);
+                env->DeleteLocalRef(fRect);
+                env->DeleteLocalRef(fLabel);
+                env->DeleteLocalRef(fInfo);
+            }
+        }
         
         // 创建 label String
         jstring labelStr = env->NewStringUTF(result.label.c_str());
@@ -229,7 +265,8 @@ Java_com_smartcheck_sdk_HandDetector_nativeDetect(
             result.score,
             keyPointsList,
             result.hasForeignObject,
-            labelStr
+            labelStr,
+            foreignObjectsList
         );
         
         env->SetObjectArrayElement(resultArray, i, handInfo);
@@ -237,6 +274,7 @@ Java_com_smartcheck_sdk_HandDetector_nativeDetect(
         // 清理局部引用
         env->DeleteLocalRef(rectF);
         env->DeleteLocalRef(keyPointsList);
+        env->DeleteLocalRef(foreignObjectsList);
         env->DeleteLocalRef(labelStr);
         env->DeleteLocalRef(handInfo);
     }
@@ -245,6 +283,9 @@ Java_com_smartcheck_sdk_HandDetector_nativeDetect(
     env->DeleteLocalRef(rectFClass);
     env->DeleteLocalRef(pointFClass);
     env->DeleteLocalRef(arrayListClass);
+    if (foreignInfoClass) {
+        env->DeleteLocalRef(foreignInfoClass);
+    }
     
     return resultArray;
 }
