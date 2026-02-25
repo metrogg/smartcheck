@@ -17,7 +17,16 @@ interface RecordDao {
     
     @Insert
     suspend fun insertRecord(record: RecordEntity): Long
+
+    @Update
+    suspend fun updateRecord(record: RecordEntity)
+
+    @Query("SELECT * FROM check_records WHERE id = :recordId")
+    suspend fun getRecordById(recordId: Long): RecordEntity?
     
     @Query("DELETE FROM check_records WHERE checkTime < :beforeTime")
     suspend fun deleteOldRecords(beforeTime: Long)
+
+    @Query("DELETE FROM check_records")
+    suspend fun deleteAllRecords()
 }

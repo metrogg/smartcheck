@@ -2,11 +2,20 @@ package com.smartcheck.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Primary = Color(0xFF2196F3)
-val PrimaryDark = Color(0xFF1976D2)
-val Accent = Color(0xFF4CAF50)
-val Error = Color(0xFFF44336)
-val Warning = Color(0xFFFF9800)
+val Primary = Color(0xFF1E6BD6)
+val PrimaryDark = Color(0xFF1555A8)
+val Accent = Color(0xFF2FBF71)
+val Warning = Color(0xFFF5A524)
+val Error = Color(0xFFE5484D)
+
+val BrandGreen = Color(0xFF10A37F)
+
+val Surface = Color(0xFFF7F9FC)
+val SurfaceVariant = Color(0xFFE6EDF5)
+val OnSurface = Color(0xFF1B2430)
+val OnSurfaceVariant = Color(0xFF5B6675)
+
+val BrandLightGreen = Color(0xFFE4F4EE)
 
 val Purple80 = Color(0xFFD0BCFF)
 val PurpleGrey80 = Color(0xFFCCC2DC)

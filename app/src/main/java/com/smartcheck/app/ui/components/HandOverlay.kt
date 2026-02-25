@@ -26,7 +26,7 @@ fun HandOverlay(
     handInfos: List<HandInfo>,
     frameWidth: Int,
     frameHeight: Int,
-    contentScale: ContentScale = ContentScale.FillBounds,
+    contentScale: ContentScale = ContentScale.Fit,
     mirrorX: Boolean,
     modifier: Modifier = Modifier
 ) {

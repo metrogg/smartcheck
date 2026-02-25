@@ -5,6 +5,7 @@ import android.speech.tts.TextToSpeech
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,6 +16,7 @@ class VoicePrompter @Inject constructor(
 
     private val isReady = AtomicBoolean(false)
     private val pending = ArrayDeque<String>()
+    private val enabledRef = AtomicReference(true)
 
     private var tts: TextToSpeech? = TextToSpeech(context, this)
 
@@ -29,6 +31,7 @@ class VoicePrompter @Inject constructor(
     }
 
     fun speak(text: String) {
+        if (!enabledRef.get()) return
         val content = text.trim()
         if (content.isEmpty()) return
 
@@ -51,5 +54,9 @@ class VoicePrompter @Inject constructor(
         tts = null
         isReady.set(false)
         pending.clear()
+    }
+
+    fun setEnabled(enabled: Boolean) {
+        enabledRef.set(enabled)
     }
 }

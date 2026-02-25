@@ -34,11 +34,22 @@ class RecordsViewModel @Inject constructor(
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
+    private val _handStatus = MutableStateFlow<Set<String>>(emptySet())
+    val handStatus: StateFlow<Set<String>> = _handStatus.asStateFlow()
+
+    private val _healthCertStatus = MutableStateFlow<Set<String>>(emptySet())
+    val healthCertStatus: StateFlow<Set<String>> = _healthCertStatus.asStateFlow()
+
+    private val _symptomFlags = MutableStateFlow<Set<String>>(emptySet())
+    val symptomFlags: StateFlow<Set<String>> = _symptomFlags.asStateFlow()
+
     val records: StateFlow<List<RecordEntity>> =
-        combine(timeFilter, query) { filter, q -> filter to q }
-            .flatMapLatest { (filter, q) ->
+        combine(timeFilter, query, handStatus, healthCertStatus, symptomFlags) { filter, q, hand, cert, symptoms ->
+            FilterState(filter, q, hand, cert, symptoms)
+        }
+            .flatMapLatest { filterState ->
                 val now = System.currentTimeMillis()
-                val base = when (filter) {
+                val base = when (filterState.filter) {
                     TimeFilter.TODAY -> {
                         val start = now - TimeUnit.DAYS.toMillis(1)
                         recordRepository.getRecordsByTimeRange(start, now)
@@ -60,7 +71,7 @@ class RecordsViewModel @Inject constructor(
                 }
 
                 base.map { list ->
-                    val trimmed = q.trim()
+                    val trimmed = filterState.query.trim()
                     if (trimmed.isEmpty()) {
                         list
                     } else {
@@ -69,6 +80,13 @@ class RecordsViewModel @Inject constructor(
                             it.userName.lowercase().contains(lower) ||
                                 it.employeeId.lowercase().contains(lower)
                         }
+                    }.filter { record ->
+                        val handOk = filterState.handStatus.isEmpty() || filterState.handStatus.contains(record.handStatus)
+                        val certOk = filterState.healthCertStatus.isEmpty() || filterState.healthCertStatus.contains(record.healthCertStatus)
+                        val symptomOk = filterState.symptomFlags.isEmpty() || filterState.symptomFlags.any { flag ->
+                            record.symptomFlags.contains(flag)
+                        }
+                        handOk && certOk && symptomOk
                     }
                 }
             }
@@ -80,5 +98,29 @@ class RecordsViewModel @Inject constructor(
 
     fun setQuery(value: String) {
         _query.value = value
+    }
+
+    fun toggleHandStatus(value: String) {
+        _handStatus.value = toggleSetValue(_handStatus.value, value)
+    }
+
+    fun toggleHealthCertStatus(value: String) {
+        _healthCertStatus.value = toggleSetValue(_healthCertStatus.value, value)
+    }
+
+    fun toggleSymptomFlag(value: String) {
+        _symptomFlags.value = toggleSetValue(_symptomFlags.value, value)
+    }
+
+    private data class FilterState(
+        val filter: TimeFilter,
+        val query: String,
+        val handStatus: Set<String>,
+        val healthCertStatus: Set<String>,
+        val symptomFlags: Set<String>
+    )
+
+    private fun toggleSetValue(set: Set<String>, value: String): Set<String> {
+        return if (set.contains(value)) set - value else set + value
     }
 }

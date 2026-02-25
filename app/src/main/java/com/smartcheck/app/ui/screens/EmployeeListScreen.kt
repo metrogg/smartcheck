@@ -1,0 +1,219 @@
+package com.smartcheck.app.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import com.smartcheck.app.ui.theme.BrandGreen
+import com.smartcheck.app.ui.theme.Dimens
+import com.smartcheck.app.utils.FileUtil
+import com.smartcheck.app.viewmodel.EmployeeListViewModel
+
+@Composable
+fun EmployeeListScreen(
+    onNavigateBack: () -> Unit,
+    onNavigateEmployeeDetail: (String) -> Unit,
+    onNavigateEmployeeNew: () -> Unit,
+    viewModel: EmployeeListViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Dimens.PaddingLarge),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "员工管理",
+                color = BrandGreen,
+                fontSize = Dimens.TextSizeTitle,
+                fontWeight = FontWeight.Bold
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "批量管理",
+                    color = Color.Black,
+                    fontSize = Dimens.TextSizeNormal
+                )
+                Spacer(modifier = Modifier.width(Dimens.PaddingNormal))
+                OutlinedTextField(
+                    value = uiState.query,
+                    onValueChange = { viewModel.setQuery(it) },
+                    modifier = Modifier
+                        .width(250.dp)
+                        .height(Dimens.InputHeight),
+                    singleLine = true,
+                    trailingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "搜索")
+                    }
+                )
+                Spacer(modifier = Modifier.width(Dimens.PaddingNormal))
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                }
+            }
+        }
+
+        val items = listOf<EmployeeListViewModel.EmployeeListItem?>(null) + uiState.items
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(5),
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            itemsIndexed(items) { index, employee ->
+                if (index == 0) {
+                    AddEmployeeCard(onClick = onNavigateEmployeeNew)
+                } else if (employee != null) {
+                    EmployeeCard(
+                        employee = employee,
+                        onClick = { onNavigateEmployeeDetail(employee.id) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddEmployeeCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(3f / 4f)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(Dimens.CornerRadius),
+        colors = CardDefaults.cardColors(containerColor = BrandGreen)
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .background(Color.White, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "新增员工",
+                    tint = BrandGreen,
+                    modifier = Modifier.size(60.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmployeeCard(
+    employee: EmployeeListViewModel.EmployeeListItem,
+    onClick: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val daysLeft = employee.daysRemaining
+    val daysColor = if (daysLeft < 7) MaterialTheme.colorScheme.error else Color.White
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(3f / 4f)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(Dimens.CornerRadius),
+        colors = CardDefaults.cardColors(containerColor = BrandGreen)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(30.dp)
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "姓名：${employee.name}",
+                    color = Color.White,
+                    fontSize = Dimens.TextSizeSmall
+                )
+                Text(
+                    text = "操作",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = Dimens.TextSizeSmall
+                )
+            }
+
+            val imageFile = FileUtil.getRecordImageFile(context, employee.faceImagePath)
+            AsyncImage(
+                model = imageFile,
+                contentDescription = employee.name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f),
+                contentScale = ContentScale.Crop
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(30.dp)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "健康证剩余：${formatDays(daysLeft)}",
+                    color = daysColor,
+                    fontSize = Dimens.TextSizeSmall
+                )
+            }
+        }
+    }
+}
+
+private fun formatDays(days: Int): String = when {
+    days < 0 -> "已过期 ${kotlin.math.abs(days)}天"
+    else -> "$days 天"
+}

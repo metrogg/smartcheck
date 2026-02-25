@@ -31,6 +31,12 @@ enum class CameraType {
     BACK    // 后置摄像头
 }
 
+enum class CameraInitState {
+    Initializing,
+    Ready,
+    Error
+}
+
 @Composable
 fun DualCameraPreview(
     modifier: Modifier = Modifier,
@@ -39,7 +45,8 @@ fun DualCameraPreview(
     enableAnalysis: Boolean = true,
     analysisThrottleMs: Long = 200L,
     onFrameAnalyzed: (Bitmap) -> Unit = {},
-    onCameraInfo: (cameraId: String, lensFacing: Int) -> Unit = { _, _ -> }
+    onCameraInfo: (cameraId: String, lensFacing: Int) -> Unit = { _, _ -> },
+    onCameraState: (CameraInitState) -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -47,9 +54,16 @@ fun DualCameraPreview(
 
     val onFrameAnalyzedState by rememberUpdatedState(onFrameAnalyzed)
     val onCameraInfoState by rememberUpdatedState(onCameraInfo)
+    val onCameraStateState by rememberUpdatedState(onCameraState)
 
     var boundCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     val executor = remember { Executors.newSingleThreadExecutor() }
+    val previewView = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FIT_CENTER
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -64,78 +78,75 @@ fun DualCameraPreview(
         }
     }
     
-    AndroidView(
-        modifier = modifier.fillMaxSize(),
-        factory = { ctx ->
-            val previewView = PreviewView(ctx).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
-            var lastAnalyzeTimeMs = 0L
-            
-            cameraProviderFuture.addListener({
-                try {
-                    val provider = cameraProviderFuture.get()
-                    boundCameraProvider = provider
+    val bindKey = remember(cameraType, preferredCameraId, enableAnalysis) { Any() }
+    LaunchedEffect(bindKey) {
+        onCameraStateState(CameraInitState.Initializing)
+        cameraProviderFuture.addListener({
+            try {
+                val provider = cameraProviderFuture.get()
+                boundCameraProvider = provider
 
-                    val cameraSelector = buildCameraSelector(provider, cameraType, preferredCameraId)
-                    
-                    // 预览用例
-                    val preview = Preview.Builder()
-                        .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+                val cameraSelector = buildCameraSelector(provider, cameraType, preferredCameraId)
+                val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
+
+                val preview = Preview.Builder()
+                    .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+                    .setTargetRotation(rotation)
+                    .build()
+                    .also {
+                        it.setSurfaceProvider(previewView.surfaceProvider)
+                    }
+
+                val useCases = mutableListOf<UseCase>(preview)
+
+                if (enableAnalysis) {
+                    val imageAnalysis = ImageAnalysis.Builder()
+                        .setTargetResolution(Size(640, 360))
+                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                        .setTargetRotation(rotation)
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                         .also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
-                        }
-                    
-                    val useCases = mutableListOf<UseCase>(preview)
-
-                    if (enableAnalysis) {
-                        // 图像分析用例
-                        val imageAnalysis = ImageAnalysis.Builder()
-                            // Keep analysis light: smaller frames + RGBA output avoids JPEG encode/decode.
-                            .setTargetResolution(Size(640, 360))
-                            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                            .setTargetRotation(previewView.display?.rotation ?: Surface.ROTATION_0)
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build()
-                            .also {
-                                it.setAnalyzer(executor) { imageProxy ->
-                                    val now = System.currentTimeMillis()
-                                    // Throttle analysis to reduce CPU load and improve UX latency.
-                                    if (now - lastAnalyzeTimeMs < analysisThrottleMs) {
-                                        imageProxy.close()
-                                    } else {
-                                        lastAnalyzeTimeMs = now
-                                        processImageProxy(imageProxy, onFrameAnalyzedState)
-                                    }
+                            var lastAnalyzeTimeMs = 0L
+                            it.setAnalyzer(executor) { imageProxy ->
+                                val now = System.currentTimeMillis()
+                                if (now - lastAnalyzeTimeMs < analysisThrottleMs) {
+                                    imageProxy.close()
+                                } else {
+                                    lastAnalyzeTimeMs = now
+                                    processImageProxy(imageProxy, onFrameAnalyzedState)
                                 }
                             }
-                        useCases.add(imageAnalysis)
-                    }
-                    
-                    // 绑定生命周期
-                    provider.unbindAll()
-                    val camera = provider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        *useCases.toTypedArray()
-                    )
-
-                    val cameraId = try {
-                        Camera2CameraInfo.from(camera.cameraInfo).cameraId
-                    } catch (e: Exception) {
-                        "unknown"
-                    }
-                    val lensFacing = runCatching { camera.cameraInfo.lensFacing }.getOrDefault(-1)
-                    onCameraInfoState(cameraId, lensFacing)
-                    Timber.d("Selected camera: type=$cameraType id=$cameraId lensFacing=$lensFacing")
-                    
-                    Timber.d("DualCameraPreview initialized: $cameraType")
-                } catch (e: Exception) {
-                    Timber.e(e, "DualCameraPreview initialization failed")
+                        }
+                    useCases.add(imageAnalysis)
                 }
-            }, ContextCompat.getMainExecutor(ctx))
-            
-            previewView
-        }
+
+                provider.unbindAll()
+                val camera = provider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    *useCases.toTypedArray()
+                )
+
+                val cameraId = try {
+                    Camera2CameraInfo.from(camera.cameraInfo).cameraId
+                } catch (e: Exception) {
+                    "unknown"
+                }
+                val lensFacing = runCatching { camera.cameraInfo.lensFacing }.getOrDefault(-1)
+                onCameraInfoState(cameraId, lensFacing)
+                Timber.d("Selected camera: type=$cameraType id=$cameraId lensFacing=$lensFacing")
+                onCameraStateState(CameraInitState.Ready)
+            } catch (e: Exception) {
+                Timber.e(e, "DualCameraPreview initialization failed")
+                onCameraStateState(CameraInitState.Error)
+            }
+        }, ContextCompat.getMainExecutor(context))
+    }
+
+    AndroidView(
+        modifier = modifier.fillMaxSize(),
+        factory = { previewView }
     )
 }
 
@@ -145,53 +156,60 @@ private fun buildCameraSelector(
     preferredCameraId: String?
 ): CameraSelector {
     if (!preferredCameraId.isNullOrBlank()) {
-        val found = provider.availableCameraInfos.any {
-            runCatching { Camera2CameraInfo.from(it).cameraId == preferredCameraId }.getOrDefault(false)
-        }
-        if (found) {
-            return CameraSelector.Builder()
-                .addCameraFilter { cameraInfos ->
-                    cameraInfos.filter {
-                        runCatching { Camera2CameraInfo.from(it).cameraId == preferredCameraId }.getOrDefault(false)
-                    }
+        val filterById = CameraSelector.Builder()
+            .addCameraFilter { cameraInfos ->
+                cameraInfos.filter {
+                    runCatching { Camera2CameraInfo.from(it).cameraId == preferredCameraId }
+                        .getOrDefault(false)
                 }
-                .build()
-        }
-        Timber.w("Preferred camera id not found: $preferredCameraId (type=$cameraType). Falling back.")
+            }
+            .build()
+        return filterById
     }
 
+    // 无强制 ID 时，尽量选择前/后摄；若设备未标注 lensFacing，则回退到“第一个可用”避免验证失败。
     return when (cameraType) {
         CameraType.FACE -> {
-            // 人脸摄像头：优先前置摄像头
-            if (provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) {
-                Timber.d("Using FRONT camera for FACE")
-                CameraSelector.DEFAULT_FRONT_CAMERA
-            } else if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
-                Timber.d("Using BACK camera for FACE (front not available)")
-                CameraSelector.DEFAULT_BACK_CAMERA
-            } else {
-                Timber.w("No front/back camera available, using first available")
+            runCatching {
+                if (provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) {
+                    Timber.d("Using FRONT camera for FACE")
+                    CameraSelector.DEFAULT_FRONT_CAMERA
+                } else if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
+                    Timber.d("Using BACK camera for FACE (front not available)")
+                    CameraSelector.DEFAULT_BACK_CAMERA
+                } else {
+                    Timber.w("No lensFacing cameras reported, using first available")
+                    CameraSelector.Builder().build()
+                }
+            }.getOrElse {
+                Timber.w(it, "CameraSelector fallback to first available (FACE)")
                 CameraSelector.Builder().build()
             }
         }
         CameraType.HAND -> {
-            // 手部摄像头：优先后置摄像头
-            if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
-                Timber.d("Using BACK camera for HAND")
-                CameraSelector.DEFAULT_BACK_CAMERA
-            } else if (provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) {
-                Timber.d("Using FRONT camera for HAND (back not available)")
-                CameraSelector.DEFAULT_FRONT_CAMERA
-            } else {
-                Timber.w("No front/back camera available, using first available")
+            runCatching {
+                if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
+                    Timber.d("Using BACK camera for HAND")
+                    CameraSelector.DEFAULT_BACK_CAMERA
+                } else if (provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) {
+                    Timber.d("Using FRONT camera for HAND (back not available)")
+                    CameraSelector.DEFAULT_FRONT_CAMERA
+                } else {
+                    Timber.w("No lensFacing cameras reported, using first available")
+                    CameraSelector.Builder().build()
+                }
+            }.getOrElse {
+                Timber.w(it, "CameraSelector fallback to first available (HAND)")
                 CameraSelector.Builder().build()
             }
         }
-        CameraType.FRONT -> {
-            CameraSelector.DEFAULT_FRONT_CAMERA
+        CameraType.FRONT -> runCatching { CameraSelector.DEFAULT_FRONT_CAMERA }.getOrElse {
+            Timber.w(it, "CameraSelector FRONT fallback to any")
+            CameraSelector.Builder().build()
         }
-        CameraType.BACK -> {
-            CameraSelector.DEFAULT_BACK_CAMERA
+        CameraType.BACK -> runCatching { CameraSelector.DEFAULT_BACK_CAMERA }.getOrElse {
+            Timber.w(it, "CameraSelector BACK fallback to any")
+            CameraSelector.Builder().build()
         }
     }
 }

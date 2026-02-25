@@ -29,6 +29,14 @@ data class UiState(
     val currentTemp: Float = 0.0f,
     val message: String = "请正视摄像头",
     val isProcessing: Boolean = false,
+    val healthCertEndDate: Long? = null,
+    val healthCertDaysRemaining: Int? = null,
+    val faceImagePath: String? = null,
+    val handPalmPath: String? = null,
+    val handBackPath: String? = null,
+    val isSubmitting: Boolean = false,
+    val isRecordFinalized: Boolean = false,
+    val symptomFlags: String = "",
     
     // 检测结果详情
     val faceConfidence: Float = 0.0f,

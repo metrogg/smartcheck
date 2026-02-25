@@ -13,7 +13,12 @@ data class UserEntity(
     
     val name: String,
     val employeeId: String,
+    val idCardNumber: String = "",
+    val healthCertImagePath: String = "",
+    val healthCertStartDate: Long? = null,
+    val healthCertEndDate: Long? = null,
     val department: String = "",
+    val faceImagePath: String? = null,
     
     // 人脸特征向量（将来接入 SeetaFace 后存储）
     val faceEmbedding: ByteArray? = null,

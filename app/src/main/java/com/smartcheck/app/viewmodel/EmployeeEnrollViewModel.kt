@@ -21,13 +21,22 @@ class EmployeeEnrollViewModel @Inject constructor(
         name: String,
         employeeId: String,
         department: String,
+        idCardNumber: String,
+        healthCertImagePath: String,
+        healthCertStartDate: Long?,
+        healthCertEndDate: Long?,
         frame: Bitmap
     ): Long? {
         val trimmedEmployeeId = employeeId.trim()
         val trimmedName = name.trim()
         val trimmedDepartment = department.trim()
+        val trimmedIdCard = idCardNumber.trim()
+        val trimmedCertPath = healthCertImagePath.trim()
 
         if (trimmedEmployeeId.isEmpty() || trimmedName.isEmpty()) return null
+        if (healthCertStartDate != null && healthCertEndDate != null && healthCertEndDate < healthCertStartDate) {
+            return null
+        }
 
         val existing = userRepository.getUserByEmployeeId(trimmedEmployeeId)
 
@@ -36,13 +45,21 @@ class EmployeeEnrollViewModel @Inject constructor(
                 UserEntity(
                     name = trimmedName,
                     employeeId = trimmedEmployeeId,
+                    idCardNumber = trimmedIdCard,
+                    healthCertImagePath = trimmedCertPath,
+                    healthCertStartDate = healthCertStartDate,
+                    healthCertEndDate = healthCertEndDate,
                     department = trimmedDepartment
                 )
             )
         } else {
             val updated = existing.copy(
                 name = trimmedName,
-                department = trimmedDepartment
+                department = trimmedDepartment,
+                idCardNumber = trimmedIdCard,
+                healthCertImagePath = trimmedCertPath,
+                healthCertStartDate = healthCertStartDate,
+                healthCertEndDate = healthCertEndDate
             )
             userRepository.updateUser(updated)
             existing.id

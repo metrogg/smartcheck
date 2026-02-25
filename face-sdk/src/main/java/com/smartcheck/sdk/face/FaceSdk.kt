@@ -11,13 +11,14 @@ object FaceSdk {
 
     private const val TAG = "FaceSdk"
 
-    private const val FD_MODEL_NAME = "fd_2_00.dat"
-    private const val LM_MODEL_NAME = "pd_2_00_pts5.dat"
-    private const val FR_MODEL_NAME = "fr_2_10.dat"
+    private const val FD_MODEL_NAME = "face_detector.csta"
+    private const val LM_MODEL_NAME = "face_landmarker_pts5.csta"
+    private const val FR_MODEL_NAME = "face_recognizer.csta"
 
-    private const val FD_MODEL_MD5 = "E88669E5F1301CA56162DE8AEF1FD5D5"
-    private const val LM_MODEL_MD5 = "877A44AA6F07CB3064AD2828F50F261A"
-    private const val FR_MODEL_MD5 = "2D637AAD8B1B7AE62154A877EC291C99"
+    // Logged for diagnostics (from the bundled SF6 dev kit).
+    private const val FD_MODEL_MD5 = "C51F6A439E8A9A3749BD97E93364A71C"
+    private const val LM_MODEL_MD5 = "BB203AE6A607EE40D7850227E5FE4FC0"
+    private const val FR_MODEL_MD5 = "785BB3208F928AD297718BD6B5DD0353"
 
     private var isInitialized = false
     private var lastInitError: String? = null
@@ -25,14 +26,21 @@ object FaceSdk {
     init {
         try {
             System.loadLibrary("c++_shared")
-            System.loadLibrary("SeetaNet")
-            System.loadLibrary("SeetaFaceDetector")
-            System.loadLibrary("SeetaFaceLandmarker")
-            System.loadLibrary("SeetaFaceRecognizer")
-            System.loadLibrary("SeetaFaceTracker")
-            System.loadLibrary("SeetaQualityAssessor")
+            System.loadLibrary("TenniS")
+            System.loadLibrary("SeetaFaceDetector600")
+            System.loadLibrary("SeetaFaceLandmarker600")
+            System.loadLibrary("SeetaFaceRecognizer600")
+            // Optional extras available in package (kept for future use)
+            runCatching { System.loadLibrary("SeetaFaceTracking600") }
+            runCatching { System.loadLibrary("SeetaFaceAntiSpoofingX600") }
+            runCatching { System.loadLibrary("SeetaAgePredictor600") }
+            runCatching { System.loadLibrary("SeetaGenderPredictor600") }
+            runCatching { System.loadLibrary("SeetaMaskDetector200") }
+            runCatching { System.loadLibrary("SeetaEyeStateDetector600") }
+            runCatching { System.loadLibrary("SeetaPoseEstimation600") }
+            runCatching { System.loadLibrary("QualityAssessor300") }
             System.loadLibrary("face_sdk")
-            Log.d(TAG, "Native library loaded successfully")
+            Log.d(TAG, "Native libraries loaded successfully")
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "Failed to load native library", e)
         }
@@ -116,10 +124,11 @@ object FaceSdk {
         return md.digest().joinToString("") { "%02X".format(it) }
     }
 
+    fun isInitialized(): Boolean = isInitialized
+
     @Synchronized
     fun init(context: Context): Int {
         if (isInitialized) {
-            Log.w(TAG, "Already initialized")
             return 0
         }
         lastInitError = null
@@ -142,12 +151,15 @@ object FaceSdk {
             val fdMd5 = md5OfFile(File(fdPath))
             val lmMd5 = md5OfFile(File(lmPath))
             val frMd5 = md5OfFile(File(frPath))
-            Log.i(TAG, "Model MD5 fd=$fdMd5 lm=$lmMd5 fr=$frMd5")
-            if (!fdMd5.equals(FD_MODEL_MD5, ignoreCase = true) ||
-                !lmMd5.equals(LM_MODEL_MD5, ignoreCase = true) ||
-                !frMd5.equals(FR_MODEL_MD5, ignoreCase = true)
-            ) {
-                Log.e(TAG, "Model MD5 mismatch. Expected fd=$FD_MODEL_MD5 lm=$LM_MODEL_MD5 fr=$FR_MODEL_MD5")
+            Log.i(TAG, "Model MD5 fd=$fdMd5 lm=$lmMd5 fr=$frMd5 (not enforced)")
+            if (FD_MODEL_MD5 != null && !fdMd5.equals(FD_MODEL_MD5, ignoreCase = true)) {
+                Log.w(TAG, "FD model MD5 mismatch; expected $FD_MODEL_MD5")
+            }
+            if (LM_MODEL_MD5 != null && !lmMd5.equals(LM_MODEL_MD5, ignoreCase = true)) {
+                Log.w(TAG, "LM model MD5 mismatch; expected $LM_MODEL_MD5")
+            }
+            if (FR_MODEL_MD5 != null && !frMd5.equals(FR_MODEL_MD5, ignoreCase = true)) {
+                Log.w(TAG, "FR model MD5 mismatch; expected $FR_MODEL_MD5")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to compute model MD5", e)
@@ -164,6 +176,9 @@ object FaceSdk {
             isInitialized = true
             Log.i(TAG, "FaceSdk initialized successfully")
         } else {
+            if (lastInitError == null) {
+                lastInitError = "nativeInit returned $ret"
+            }
             Log.e(TAG, "Failed to initialize FaceSdk: $ret")
         }
         return ret

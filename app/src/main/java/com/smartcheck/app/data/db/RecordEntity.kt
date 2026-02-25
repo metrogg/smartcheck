@@ -20,6 +20,12 @@ data class RecordEntity(
     val isTempNormal: Boolean,
     val isHandNormal: Boolean,
     val isPassed: Boolean,
+    val handStatus: String = "",
+    val healthCertStatus: String = "",
+    val symptomFlags: String = "",
+    val faceImagePath: String? = null,
+    val handPalmPath: String? = null,
+    val handBackPath: String? = null,
     
     // 时间戳
     val checkTime: Long = System.currentTimeMillis(),

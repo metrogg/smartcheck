@@ -10,28 +10,50 @@ add_library(face_sdk SHARED
 )
 
 target_include_directories(face_sdk PRIVATE
-    ${CMAKE_SOURCE_DIR}/../../../../third_party/seetaface2/include
+    ${CMAKE_SOURCE_DIR}/../../../../sf6.0_android/include
 )
 
 set(SEETA_LIB_DIR ${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
 
-add_library(SeetaNet SHARED IMPORTED)
-set_target_properties(SeetaNet PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaNet.so)
+add_library(TenniS SHARED IMPORTED)
+set_target_properties(TenniS PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libTenniS.so)
 
 add_library(SeetaFaceDetector SHARED IMPORTED)
-set_target_properties(SeetaFaceDetector PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceDetector.so)
+set_target_properties(SeetaFaceDetector PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceDetector600.so)
 
 add_library(SeetaFaceLandmarker SHARED IMPORTED)
-set_target_properties(SeetaFaceLandmarker PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceLandmarker.so)
+set_target_properties(SeetaFaceLandmarker PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceLandmarker600.so)
 
 add_library(SeetaFaceRecognizer SHARED IMPORTED)
-set_target_properties(SeetaFaceRecognizer PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceRecognizer.so)
+set_target_properties(SeetaFaceRecognizer PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceRecognizer600.so)
 
-add_library(SeetaFaceTracker SHARED IMPORTED)
-set_target_properties(SeetaFaceTracker PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceTracker.so)
+add_library(SeetaFaceTracking SHARED IMPORTED)
+set_target_properties(SeetaFaceTracking PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceTracking600.so)
+
+add_library(SeetaFaceAntiSpoofing SHARED IMPORTED)
+set_target_properties(SeetaFaceAntiSpoofing PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceAntiSpoofingX600.so)
 
 add_library(SeetaQualityAssessor SHARED IMPORTED)
-set_target_properties(SeetaQualityAssessor PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaQualityAssessor.so)
+set_target_properties(SeetaQualityAssessor PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libQualityAssessor300.so)
+
+add_library(SeetaAgePredictor SHARED IMPORTED)
+set_target_properties(SeetaAgePredictor PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaAgePredictor600.so)
+
+add_library(SeetaGenderPredictor SHARED IMPORTED)
+set_target_properties(SeetaGenderPredictor PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaGenderPredictor600.so)
+
+add_library(SeetaMaskDetector SHARED IMPORTED)
+set_target_properties(SeetaMaskDetector PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaMaskDetector200.so)
+
+add_library(SeetaEyeStateDetector SHARED IMPORTED)
+set_target_properties(SeetaEyeStateDetector PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaEyeStateDetector600.so)
+
+add_library(SeetaPoseEstimation SHARED IMPORTED)
+set_target_properties(SeetaPoseEstimation PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libPoseEstimation600.so)
+
+# Optional / legacy stubs absent in arm64 package: guard in case linker looks for them.
+# add_library(SeetaFaceDetectorJava SHARED IMPORTED)
+# set_target_properties(SeetaFaceDetectorJava PROPERTIES IMPORTED_LOCATION ${SEETA_LIB_DIR}/libSeetaFaceDetector600_java.so)
 
 find_library(log-lib log)
 find_library(jnigraphics-lib jnigraphics)
@@ -40,9 +62,9 @@ target_link_libraries(face_sdk
     SeetaFaceDetector
     SeetaFaceLandmarker
     SeetaFaceRecognizer
-    SeetaFaceTracker
+    SeetaFaceTracking
     SeetaQualityAssessor
-    SeetaNet
+    TenniS
     ${log-lib}
     ${jnigraphics-lib}
 )

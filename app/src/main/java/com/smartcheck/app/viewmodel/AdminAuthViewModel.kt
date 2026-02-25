@@ -12,10 +12,13 @@ class AdminAuthViewModel @Inject constructor(
 ) : ViewModel() {
 
     val isLoggedIn: StateFlow<Boolean> = adminAuthRepository.isLoggedIn
+    val account: StateFlow<String> = adminAuthRepository.account
 
-    fun login(password: String): Boolean = adminAuthRepository.login(password)
+    fun login(account: String, password: String): Boolean = adminAuthRepository.login(account, password)
 
     fun logout() = adminAuthRepository.logout()
 
     fun setPassword(newPassword: String) = adminAuthRepository.setPassword(newPassword)
+
+    fun setAccount(newAccount: String) = adminAuthRepository.setAccount(newAccount)
 }

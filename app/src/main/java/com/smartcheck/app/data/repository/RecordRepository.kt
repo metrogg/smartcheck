@@ -20,6 +20,12 @@ class RecordRepository @Inject constructor(
         recordDao.getRecordsByTimeRange(startTime, endTime)
     
     suspend fun insertRecord(record: RecordEntity): Long = recordDao.insertRecord(record)
+
+    suspend fun updateRecord(record: RecordEntity) = recordDao.updateRecord(record)
+
+    suspend fun getRecordById(recordId: Long): RecordEntity? = recordDao.getRecordById(recordId)
     
     suspend fun deleteOldRecords(beforeTime: Long) = recordDao.deleteOldRecords(beforeTime)
+
+    suspend fun deleteAllRecords() = recordDao.deleteAllRecords()
 }

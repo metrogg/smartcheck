@@ -2,12 +2,22 @@ package com.smartcheck.app
 
 import android.app.Application
 import android.os.Build
+import androidx.camera.camera2.Camera2Config
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraXConfig
 import com.smartcheck.sdk.HandDetector
+import com.smartcheck.sdk.face.FaceSdk
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
+import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @HiltAndroidApp
-class App : Application() {
+class App : Application(), CameraXConfig.Provider {
     
     override fun onCreate() {
         super.onCreate()
@@ -18,9 +28,41 @@ class App : Application() {
         }
         
         Timber.d("SmartCheck Application Started")
+
+        installCrashHandler()
         
         // 初始化 HandDetector
         initHandDetector()
+
+        // 初始化 FaceSdk (仅一次)
+        initFaceSdk()
+    }
+
+    private fun installCrashHandler() {
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val logsDir = File(filesDir, "logs")
+                if (!logsDir.exists()) {
+                    logsDir.mkdirs()
+                }
+                val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+                    .format(System.currentTimeMillis())
+                val file = File(logsDir, "crash_$stamp.txt")
+                val sw = StringWriter()
+                val pw = PrintWriter(sw)
+                pw.println("Thread: ${thread.name}")
+                pw.println("Time: $stamp")
+                pw.println()
+                throwable.printStackTrace(pw)
+                pw.flush()
+                file.writeText(sw.toString())
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to write crash log")
+            } finally {
+                previousHandler?.uncaughtException(thread, throwable)
+            }
+        }
     }
     
     private fun initHandDetector() {
@@ -43,5 +85,36 @@ class App : Application() {
         } catch (e: Exception) {
             Timber.e(e, "Failed to initialize HandDetector")
         }
+    }
+
+    private fun initFaceSdk() {
+        try {
+            val ret = FaceSdk.init(this)
+            if (ret == 0) {
+                Timber.i("FaceSdk initialized successfully")
+            } else {
+                Timber.e("FaceSdk initialization failed: $ret, ${FaceSdk.getLastInitError()}")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to initialize FaceSdk")
+        }
+    }
+
+    override fun getCameraXConfig(): CameraXConfig {
+        val defaultConfig = Camera2Config.defaultConfig()
+        val builder = CameraXConfig.Builder.fromConfig(defaultConfig)
+        val preferredIds = setOf("100", "102")
+
+        builder.setAvailableCamerasLimiter(
+            CameraSelector.Builder()
+                .addCameraFilter { cameraInfos ->
+                    cameraInfos.filter {
+                        runCatching { Camera2CameraInfo.from(it).cameraId in preferredIds }
+                            .getOrDefault(false)
+                    }
+                }
+                .build()
+        )
+        return builder.build()
     }
 }

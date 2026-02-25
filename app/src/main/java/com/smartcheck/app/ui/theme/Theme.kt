@@ -12,14 +12,22 @@ private val DarkColorScheme = darkColorScheme(
     primary = Primary,
     secondary = Accent,
     tertiary = Pink80,
-    error = Error
+    error = Error,
+    surface = Surface,
+    surfaceVariant = SurfaceVariant,
+    onSurface = OnSurface,
+    onSurfaceVariant = OnSurfaceVariant
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = Primary,
     secondary = Accent,
     tertiary = Pink40,
-    error = Error
+    error = Error,
+    surface = Surface,
+    surfaceVariant = SurfaceVariant,
+    onSurface = OnSurface,
+    onSurfaceVariant = OnSurfaceVariant
 )
 
 @Composable

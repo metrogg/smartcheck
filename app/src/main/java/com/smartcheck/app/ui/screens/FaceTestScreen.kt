@@ -10,6 +10,7 @@ import android.net.Uri
 import android.content.Intent
 import android.app.Activity
 import android.provider.DocumentsContract
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -35,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.smartcheck.app.ui.components.CameraType
+import com.smartcheck.app.ui.components.DualCameraPreview
 import com.smartcheck.app.viewmodel.FaceTestViewModel
 import com.smartcheck.sdk.face.FaceInfo
 import com.smartcheck.sdk.face.FaceSdk
@@ -52,9 +55,14 @@ fun FaceTestScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // 预览帧来自内置 CameraX，不依赖系统相机 App
+
+    var initCode by remember { mutableIntStateOf(Int.MIN_VALUE) }
+    var initError by remember { mutableStateOf<String?>(null) }
+
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var annotatedBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var photoUri by remember { mutableStateOf<Uri?>(null) }
+    var latestFrame by remember { mutableStateOf<Bitmap?>(null) }
 
     var isProcessing by remember { mutableStateOf(false) }
     var faces by remember { mutableStateOf<List<FaceInfo>>(emptyList()) }
@@ -69,9 +77,47 @@ fun FaceTestScreen(
     var registeredFeature by remember { mutableStateOf<FloatArray?>(null) }
     var similarity by remember { mutableStateOf<Float?>(null) }
 
+    fun processBitmap(source: Bitmap, sourceLabel: String = "") {
+        if (isProcessing) return
+        isProcessing = true
+        scope.launch(Dispatchers.Default) {
+            try {
+                val scaledBitmap = scaleBitmapDown(source, 1024)
+                val faceResult = FaceSdk.detect(scaledBitmap)
+                val annotated = if (faceResult.isNotEmpty()) drawFaceDetections(scaledBitmap, faceResult) else null
+                val feature = FaceSdk.extractFeature(scaledBitmap)
+                val sim = if (registeredFeature != null && feature != null) {
+                    FaceSdk.calculateSimilarity(registeredFeature!!, feature)
+                } else null
+
+                withContext(Dispatchers.Main) {
+                    originalBitmap = scaledBitmap
+                    annotatedBitmap = annotated
+                    faces = faceResult
+                    lastFeature = feature
+                    similarity = sim
+                    if (faceResult.isEmpty()) {
+                        Toast.makeText(context, "未检测到人脸${if (sourceLabel.isNotBlank()) "($sourceLabel)" else ""}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to process image")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "处理图像失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    isProcessing = false
+                }
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            FaceSdk.init(context)
+            val ret = FaceSdk.init(context)
+            initCode = ret
+            initError = FaceSdk.getLastInitError()
         }
     }
 
@@ -92,26 +138,9 @@ fun FaceTestScreen(
                 BitmapFactory.decodeStream(input)
             } ?: return@rememberLauncherForActivityResult
 
-            val scaledBitmap = scaleBitmapDown(bitmap, 1024)
-            originalBitmap = scaledBitmap
-            annotatedBitmap = null
-            registerResult = null
-            isProcessing = true
-
-            val faceResult = FaceSdk.detect(scaledBitmap)
-            faces = faceResult
-            annotatedBitmap = if (faceResult.isNotEmpty()) drawFaceDetections(scaledBitmap, faceResult) else null
-
-            lastFeature = FaceSdk.extractFeature(scaledBitmap)
-            similarity = if (registeredFeature != null && lastFeature != null) {
-                FaceSdk.calculateSimilarity(registeredFeature!!, lastFeature!!)
-            } else {
-                null
-            }
+            processBitmap(bitmap, "文件选择")
         } catch (e: Exception) {
             Timber.e(e, "Failed to load image")
-        } finally {
-            isProcessing = false
         }
     }
 
@@ -125,26 +154,9 @@ fun FaceTestScreen(
                 BitmapFactory.decodeStream(input)
             } ?: return@rememberLauncherForActivityResult
 
-            val scaledBitmap = scaleBitmapDown(bitmap, 1024)
-            originalBitmap = scaledBitmap
-            annotatedBitmap = null
-            registerResult = null
-            isProcessing = true
-
-            val faceResult = FaceSdk.detect(scaledBitmap)
-            faces = faceResult
-            annotatedBitmap = if (faceResult.isNotEmpty()) drawFaceDetections(scaledBitmap, faceResult) else null
-
-            lastFeature = FaceSdk.extractFeature(scaledBitmap)
-            similarity = if (registeredFeature != null && lastFeature != null) {
-                FaceSdk.calculateSimilarity(registeredFeature!!, lastFeature!!)
-            } else {
-                null
-            }
+            processBitmap(bitmap, "相册")
         } catch (e: Exception) {
             Timber.e(e, "Failed to load image (GetContent)")
-        } finally {
-            isProcessing = false
         }
     }
 
@@ -165,38 +177,6 @@ fun FaceTestScreen(
         pickGalleryLauncher.launch("image/*")
     }
 
-    val takePictureLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success && photoUri != null) {
-            if (isProcessing) return@rememberLauncherForActivityResult
-            try {
-                val inputStream = context.contentResolver.openInputStream(photoUri!!)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                val scaledBitmap = scaleBitmapDown(bitmap, 1024)
-                originalBitmap = scaledBitmap
-                annotatedBitmap = null
-                registerResult = null
-                isProcessing = true
-
-                val result = FaceSdk.detect(scaledBitmap)
-                faces = result
-                annotatedBitmap = if (result.isNotEmpty()) drawFaceDetections(scaledBitmap, result) else null
-
-                lastFeature = FaceSdk.extractFeature(scaledBitmap)
-                similarity = if (registeredFeature != null && lastFeature != null) {
-                    FaceSdk.calculateSimilarity(registeredFeature!!, lastFeature!!)
-                } else {
-                    null
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to load photo")
-            } finally {
-                isProcessing = false
-            }
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -205,11 +185,32 @@ fun FaceTestScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "人脸识别 Demo (SeetaFace2)",
+            text = "人脸识别 Demo (SeetaFace6)",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 12.dp)
         )
+
+        if (initCode != Int.MIN_VALUE) {
+            val ok = initCode == 0
+            Text(
+                text = if (ok) {
+                    "FaceSdk 初始化成功"
+                } else {
+                    "FaceSdk 初始化失败: code=$initCode"
+                },
+                color = if (ok) Color(0xFF1B5E20) else Color(0xFFB71C1C),
+                fontWeight = FontWeight.Bold,
+            )
+            if (!ok && !initError.isNullOrBlank()) {
+                Text(
+                    text = "原因: ${initError}",
+                    color = Color(0xFFB71C1C),
+                    fontSize = 12.sp,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
 
         if (onNavigateHome != null) {
             OutlinedButton(onClick = onNavigateHome) {
@@ -218,6 +219,26 @@ fun FaceTestScreen(
 
             Spacer(Modifier.height(12.dp))
         }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            DualCameraPreview(
+                modifier = Modifier.fillMaxSize(),
+                cameraType = CameraType.FACE,
+                preferredCameraId = "100",
+                enableAnalysis = true,
+                analysisThrottleMs = 300L,
+                onFrameAnalyzed = { frame ->
+                    latestFrame = frame
+                }
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -235,18 +256,17 @@ fun FaceTestScreen(
             Button(
                 modifier = Modifier.weight(1f),
                 onClick = {
-                    try {
-                        val photoFile = File(context.cacheDir, "face_test_${System.currentTimeMillis()}.jpg")
-                        photoUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
-                        takePictureLauncher.launch(photoUri)
-                    } catch (e: Exception) {
-                        Timber.e(e)
+                    val frame = latestFrame
+                    if (frame == null) {
+                        Toast.makeText(context, "尚未获取到摄像头画面", Toast.LENGTH_SHORT).show()
+                        return@Button
                     }
+                    processBitmap(frame, "预览帧")
                 }
             ) {
                 Icon(Icons.Default.CameraAlt, null)
                 Spacer(Modifier.width(6.dp))
-                Text("拍照")
+                Text("抓取预览帧")
             }
         }
 
@@ -284,33 +304,6 @@ fun FaceTestScreen(
 
             if (isProcessing) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Button(
-                enabled = lastFeature != null,
-                onClick = {
-                    registeredFeature = lastFeature
-                    similarity = null
-                }
-            ) {
-                Text("设为注册")
-            }
-
-            OutlinedButton(
-                enabled = registeredFeature != null,
-                onClick = {
-                    registeredFeature = null
-                    similarity = null
-                }
-            ) {
-                Text("清除注册")
             }
         }
 
@@ -388,10 +381,6 @@ fun FaceTestScreen(
         Text(
             text = if (faces.isEmpty()) "未检测到人脸" else "检测到 ${faces.size} 张人脸",
             fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = if (registeredFeature == null) "未注册人脸" else "已注册人脸特征 (len=${registeredFeature!!.size})"
         )
 
         if (similarity != null) {

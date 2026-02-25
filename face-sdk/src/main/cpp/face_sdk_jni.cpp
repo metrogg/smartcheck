@@ -3,10 +3,10 @@
 #include <android/bitmap.h>
 #include <android/log.h>
 
-#include <cstdint>
 #include <cerrno>
-#include <cstring>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <memory>
 #include <stdexcept>
@@ -15,17 +15,16 @@
 
 #include <sys/stat.h>
 
+#include "seeta/Common/Struct.h"
 #include "seeta/FaceDetector.h"
 #include "seeta/FaceLandmarker.h"
 #include "seeta/FaceRecognizer.h"
-#include "seeta/Struct.h"
 
 #define LOG_TAG "FaceSdkJNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 static bool g_initialized = false;
-
 static std::unique_ptr<seeta::FaceDetector> g_face_detector;
 static std::unique_ptr<seeta::FaceLandmarker> g_face_landmarker;
 static std::unique_ptr<seeta::FaceRecognizer> g_face_recognizer;
@@ -297,40 +296,33 @@ Java_com_smartcheck_sdk_face_FaceSdk_nativeInit(
         g_fr_setting.id = 0;
         g_fr_setting.model = g_fr_models;
 
-        LOGI(
-            "nativeInit settings: fd(device=%d id=%d model0=%s) lm(device=%d id=%d model0=%s) fr(device=%d id=%d model0=%s)",
-            static_cast<int>(g_fd_setting.device),
-            g_fd_setting.id,
-            g_fd_setting.model && g_fd_setting.model[0] ? g_fd_setting.model[0] : "(null)",
-            static_cast<int>(g_lm_setting.device),
-            g_lm_setting.id,
-            g_lm_setting.model && g_lm_setting.model[0] ? g_lm_setting.model[0] : "(null)",
-            static_cast<int>(g_fr_setting.device),
-            g_fr_setting.id,
-            g_fr_setting.model && g_fr_setting.model[0] ? g_fr_setting.model[0] : "(null)");
+    LOGI(
+        "nativeInit settings: fd(device=%d id=%d model0=%s) lm(device=%d id=%d model0=%s) fr(device=%d id=%d model0=%s)",
+        static_cast<int>(g_fd_setting.device),
+        g_fd_setting.id,
+        g_fd_setting.model && g_fd_setting.model[0] ? g_fd_setting.model[0] : "(null)",
+        static_cast<int>(g_lm_setting.device),
+        g_lm_setting.id,
+        g_lm_setting.model && g_lm_setting.model[0] ? g_lm_setting.model[0] : "(null)",
+        static_cast<int>(g_fr_setting.device),
+        g_fr_setting.id,
+        g_fr_setting.model && g_fr_setting.model[0] ? g_fr_setting.model[0] : "(null)");
 
-        // Some vendor builds show unstable allocator behavior inside FaceDetector ctor when core size
-        // is not explicitly specified. Prefer explicit core size to avoid internal size underflow.
-        const int core_width = 640;
-        const int core_height = 480;
-        LOGI(
-            "nativeInit creating FaceDetector... core=%dx%d sizeof(SeetaModelSetting)=%zu",
-            core_width,
-            core_height,
-            sizeof(SeetaModelSetting));
-        g_face_detector = std::make_unique<seeta::FaceDetector>(g_fd_setting, core_width, core_height);
-        LOGI("nativeInit FaceDetector ok");
+    LOGI(
+        "nativeInit creating FaceDetector... core=auto sizeof(SeetaModelSetting)=%zu",
+        sizeof(SeetaModelSetting));
+    g_face_detector = std::make_unique<seeta::FaceDetector>(g_fd_setting);
+    LOGI("nativeInit FaceDetector ok");
 
-        LOGI("nativeInit creating FaceLandmarker...");
-        g_face_landmarker = std::make_unique<seeta::FaceLandmarker>(g_lm_setting);
-        LOGI("nativeInit FaceLandmarker ok");
+    LOGI("nativeInit creating FaceLandmarker...");
+    g_face_landmarker = std::make_unique<seeta::FaceLandmarker>(g_lm_setting);
+    LOGI("nativeInit FaceLandmarker ok");
 
-        LOGI("nativeInit creating FaceRecognizer...");
-        g_face_recognizer = std::make_unique<seeta::FaceRecognizer>(g_fr_setting);
-        LOGI("nativeInit FaceRecognizer ok");
+    LOGI("nativeInit creating FaceRecognizer...");
+    g_face_recognizer = std::make_unique<seeta::FaceRecognizer>(g_fr_setting);
+    LOGI("nativeInit FaceRecognizer ok");
 
         g_face_detector->set(seeta::FaceDetector::PROPERTY_MIN_FACE_SIZE, 40);
-        g_face_detector->set(seeta::FaceDetector::PROPERTY_VIDEO_STABLE, 0);
 
         g_landmark_num = g_face_landmarker->number();
         g_initialized = true;

@@ -1,30 +1,48 @@
 package com.smartcheck.app.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.smartcheck.app.data.repository.AdminAuthRepository
 import com.smartcheck.app.viewmodel.AdminAuthViewModel
+import com.smartcheck.app.viewmodel.SettingsViewModel
+import com.smartcheck.app.ui.theme.BrandGreen
+import com.smartcheck.app.ui.theme.Dimens
+import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminLoginScreen(
     onNavigateBack: () -> Unit,
     onLoginSuccess: () -> Unit = {},
-    viewModel: AdminAuthViewModel = hiltViewModel()
+    viewModel: AdminAuthViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
+    var account by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var passwordVisible by remember { mutableStateOf(false) }
+    var rememberPassword by remember { mutableStateOf(true) }
+
+    val storedAccount by viewModel.account.collectAsState()
+    LaunchedEffect(storedAccount) {
+        if (account.isBlank()) {
+            account = storedAccount
+        }
+    }
 
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     LaunchedEffect(isLoggedIn) {
@@ -33,39 +51,87 @@ fun AdminLoginScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("管理员登录") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
+    Row(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .weight(0.4f)
+                .fillMaxHeight()
+                .background(BrandGreen)
+                .padding(Dimens.PaddingLarge),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Home,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
+                Text(
+                    text = "某某科技公司",
+                    fontSize = Dimens.TextSizeNormal,
+                    color = Color.White
+                )
+            }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "当前版本：1.0.6",
+                    fontSize = Dimens.TextSizeSmall,
+                    color = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.align(Alignment.BottomStart)
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(0.6f)
+                .fillMaxHeight()
+                .background(Color.White),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "默认密码：${AdminAuthRepository.DEFAULT_PASSWORD}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "欢迎使用智能晨检仪",
+                fontSize = Dimens.TextSizeTitle,
+                fontWeight = FontWeight.Bold,
+                color = BrandGreen
             )
-
+            Spacer(modifier = Modifier.height(Dimens.PaddingLarge))
+            OutlinedTextField(
+                value = account,
+                onValueChange = {
+                    account = it
+                    error = null
+                },
+                modifier = Modifier.fillMaxWidth(0.7f),
+                label = { Text("账号", fontSize = Dimens.TextSizeNormal) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null
+                    )
+                },
+                textStyle = LocalTextStyle.current.copy(fontSize = Dimens.TextSizeNormal),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(Dimens.PaddingNormal))
             OutlinedTextField(
                 value = password,
                 onValueChange = {
                     password = it
                     error = null
                 },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("密码") },
+                modifier = Modifier.fillMaxWidth(0.7f),
+                label = { Text("密码", fontSize = Dimens.TextSizeNormal) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null
+                    )
+                },
+                textStyle = LocalTextStyle.current.copy(fontSize = Dimens.TextSizeNormal),
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
@@ -78,26 +144,46 @@ fun AdminLoginScreen(
                 },
                 isError = error != null
             )
-
             if (error != null) {
+                Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
                 Text(
                     text = error ?: "",
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
+                    fontSize = Dimens.TextSizeSmall
                 )
             }
-
+            Spacer(modifier = Modifier.height(Dimens.PaddingLarge))
             Button(
                 onClick = {
-                    val ok = viewModel.login(password)
+                    val ok = viewModel.login(account, password)
                     if (!ok) {
-                        error = "密码错误"
+                        error = "账号或密码错误"
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(Dimens.ButtonHeight),
+                colors = ButtonDefaults.buttonColors(containerColor = BrandGreen)
             ) {
-                Text("登录")
+                Text("登录", fontSize = Dimens.TextSizeNormal)
+            }
+            Spacer(modifier = Modifier.height(Dimens.PaddingLarge))
+            Row(
+                modifier = Modifier.fillMaxWidth(0.7f),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = rememberPassword,
+                        onCheckedChange = { rememberPassword = it }
+                    )
+                    Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
+                    Text(text = "记住密码", fontSize = Dimens.TextSizeSmall)
+                }
+                TextButton(onClick = { }) {
+                    Text(text = "忘记密码？", fontSize = Dimens.TextSizeSmall, color = BrandGreen)
+                }
             }
         }
     }
