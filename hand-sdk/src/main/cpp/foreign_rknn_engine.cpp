@@ -257,9 +257,12 @@ ForeignResult ForeignRknnEngine::detect(const cv::Mat& hand_crop) {
     }
     LOGD("Objectness channel max: %.4f", max_objectness);
     
+    const int class_start = 4;
+    const int num_classes = 7;
+
     // 检查类别通道
-    for (int c = 0; c < 7; c++) {
-        float* class_ch = float_output + (5 + c) * num_boxes;
+    for (int c = 0; c < num_classes; c++) {
+        float* class_ch = float_output + (class_start + c) * num_boxes;
         float max_class = 0.0f;
         for (int i = 0; i < num_boxes; i++) {
             if (class_ch[i] > max_class) max_class = class_ch[i];
@@ -285,6 +288,8 @@ ForeignResult ForeignRknnEngine::postprocess(float* output, int crop_width, int 
     const int num_boxes = 8400;
     const int num_features = 53;
     const int num_classes = 7;
+    const int class_start = 4;
+    const int hand_class_id = 6;
     
     ForeignResult result;
     result.class_id = -1;
@@ -310,8 +315,8 @@ ForeignResult ForeignRknnEngine::postprocess(float* output, int crop_width, int 
     int sample_step = 13;
     int sample_count = 0;
     for (int i = 0; i < num_boxes && sample_count < 200; i += sample_step, sample_count++) {
-        for (int c = 0; c < 7; c++) {
-            float v = output[num_boxes * (4 + c) + i];
+        for (int c = 0; c < num_classes; c++) {
+            float v = output[num_boxes * (class_start + c) + i];
             sample_max = std::max(sample_max, v);
             sample_min = std::min(sample_min, v);
         }
@@ -325,7 +330,7 @@ ForeignResult ForeignRknnEngine::postprocess(float* output, int crop_width, int 
     candidates.reserve(64);
 
     for (int i = 0; i < num_boxes; i++) {
-        float hand_prob_raw = output[num_boxes * (4 + 6) + i];
+        float hand_prob_raw = output[num_boxes * (class_start + hand_class_id) + i];
         float hand_prob = need_sigmoid ? sigmoid(hand_prob_raw) : hand_prob_raw;
         if (hand_prob > best_hand_score) {
             best_hand_score = hand_prob;
@@ -335,8 +340,8 @@ ForeignResult ForeignRknnEngine::postprocess(float* output, int crop_width, int 
         float max_class_prob = 0.0f;
         int max_class_id = -1;
 
-        for (int c = 0; c < 6; c++) {
-            float class_prob_raw = output[num_boxes * (4 + c) + i];
+        for (int c = 0; c < num_classes - 1; c++) {
+            float class_prob_raw = output[num_boxes * (class_start + c) + i];
             float class_prob = need_sigmoid ? sigmoid(class_prob_raw) : class_prob_raw;
             if (class_prob > max_class_prob) {
                 max_class_prob = class_prob;
@@ -410,10 +415,11 @@ ForeignResult ForeignRknnEngine::postprocess(float* output, int crop_width, int 
         kp_idx = kept[0].idx;
     }
 
+    const int kp_start = class_start + num_classes;
     if (kp_idx >= 0) {
         for (int k = 0; k < NUM_KEYPOINTS; k++) {
-            float kx = output[num_boxes * (11 + k * 2) + kp_idx];
-            float ky = output[num_boxes * (11 + k * 2 + 1) + kp_idx];
+            float kx = output[num_boxes * (kp_start + k * 2) + kp_idx];
+            float ky = output[num_boxes * (kp_start + k * 2 + 1) + kp_idx];
 
             kx = (kx - offset_x) / scale;
             ky = (ky - offset_y) / scale;

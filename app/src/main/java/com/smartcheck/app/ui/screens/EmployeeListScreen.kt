@@ -2,6 +2,7 @@ package com.smartcheck.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,9 +32,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,7 +44,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.request.ImageRequest
 import com.smartcheck.app.ui.theme.BrandGreen
 import com.smartcheck.app.ui.theme.Dimens
 import com.smartcheck.app.utils.FileUtil
@@ -119,11 +125,16 @@ fun EmployeeListScreen(
 
 @Composable
 private fun AddEmployeeCard(onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(3f / 4f)
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberRipple(),
+                onClick = onClick
+            ),
         shape = RoundedCornerShape(Dimens.CornerRadius),
         colors = CardDefaults.cardColors(containerColor = BrandGreen)
     ) {
@@ -153,12 +164,17 @@ private fun EmployeeCard(
     val context = androidx.compose.ui.platform.LocalContext.current
     val daysLeft = employee.daysRemaining
     val daysColor = if (daysLeft < 7) MaterialTheme.colorScheme.error else Color.White
+    val interactionSource = remember { MutableInteractionSource() }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(3f / 4f)
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = rememberRipple(),
+                onClick = onClick
+            ),
         shape = RoundedCornerShape(Dimens.CornerRadius),
         colors = CardDefaults.cardColors(containerColor = BrandGreen)
     ) {
@@ -174,11 +190,19 @@ private fun EmployeeCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "姓名：${employee.name}",
-                    color = Color.White,
-                    fontSize = Dimens.TextSizeSmall
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "姓名：",
+                        color = Color.Gray,
+                        fontSize = Dimens.TextSizeSmall
+                    )
+                    Text(
+                        text = employee.name,
+                        color = Color.Black,
+                        fontSize = Dimens.TextSizeSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 Text(
                     text = "操作",
                     color = MaterialTheme.colorScheme.error,
@@ -187,14 +211,39 @@ private fun EmployeeCard(
             }
 
             val imageFile = FileUtil.getRecordImageFile(context, employee.faceImagePath)
-            AsyncImage(
-                model = imageFile,
+            val request = ImageRequest.Builder(context)
+                .data(imageFile)
+                .size(width = 200, height = 200)
+                .crossfade(true)
+                .build()
+            SubcomposeAsyncImage(
+                model = request,
                 contentDescription = employee.name,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f),
                 contentScale = ContentScale.Crop
-            )
+            ) {
+                when (painter.state) {
+                    is coil.compose.AsyncImagePainter.State.Loading,
+                    is coil.compose.AsyncImagePainter.State.Error -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0xFFE5E7EB)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = Color(0xFF9CA3AF),
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+                    }
+                    else -> SubcomposeAsyncImageContent()
+                }
+            }
 
             Row(
                 modifier = Modifier
@@ -204,9 +253,15 @@ private fun EmployeeCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "健康证剩余：${formatDays(daysLeft)}",
-                    color = daysColor,
+                    text = "健康证剩余：",
+                    color = Color.Gray,
                     fontSize = Dimens.TextSizeSmall
+                )
+                Text(
+                    text = formatDays(daysLeft),
+                    color = Color.Black,
+                    fontSize = Dimens.TextSizeSmall,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }

@@ -13,15 +13,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.smartcheck.app.viewmodel.AdminAuthViewModel
 import com.smartcheck.app.viewmodel.SettingsViewModel
 import com.smartcheck.app.ui.theme.BrandGreen
 import com.smartcheck.app.ui.theme.Dimens
 import androidx.compose.ui.text.font.FontWeight
+import com.smartcheck.app.data.repository.AdminAuthRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,20 +41,37 @@ fun AdminLoginScreen(
     var rememberPassword by remember { mutableStateOf(true) }
 
     val storedAccount by viewModel.account.collectAsState()
+    val loginTitle by settingsViewModel.loginTitle.collectAsState()
+    val loginBackground by settingsViewModel.loginBackground.collectAsState()
+    val canteenName by settingsViewModel.canteenName.collectAsState()
+    LaunchedEffect(Unit) {
+        viewModel.logout()
+    }
     LaunchedEffect(storedAccount) {
         if (account.isBlank()) {
-            account = storedAccount
+            account = if (storedAccount.isBlank()) AdminAuthRepository.DEFAULT_ACCOUNT else storedAccount
+        }
+        if (password.isBlank()) {
+            password = AdminAuthRepository.DEFAULT_PASSWORD
         }
     }
 
-    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
-    LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn) {
-            onLoginSuccess()
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (loginBackground.isNotBlank()) {
+            AsyncImage(
+                model = loginBackground,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White.copy(alpha = 0.88f))
+            )
         }
-    }
 
-    Row(modifier = Modifier.fillMaxSize()) {
+        Row(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .weight(0.4f)
@@ -69,7 +89,7 @@ fun AdminLoginScreen(
                 )
                 Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
                 Text(
-                    text = "某某科技公司",
+                    text = if (canteenName.isBlank()) "某某科技公司" else canteenName,
                     fontSize = Dimens.TextSizeNormal,
                     color = Color.White
                 )
@@ -93,7 +113,7 @@ fun AdminLoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "欢迎使用智能晨检仪",
+                text = if (loginTitle.isBlank()) "欢迎使用智能晨检仪" else loginTitle,
                 fontSize = Dimens.TextSizeTitle,
                 fontWeight = FontWeight.Bold,
                 color = BrandGreen
@@ -156,7 +176,9 @@ fun AdminLoginScreen(
             Button(
                 onClick = {
                     val ok = viewModel.login(account, password)
-                    if (!ok) {
+                    if (ok) {
+                        onLoginSuccess()
+                    } else {
                         error = "账号或密码错误"
                     }
                 },
@@ -185,6 +207,7 @@ fun AdminLoginScreen(
                     Text(text = "忘记密码？", fontSize = Dimens.TextSizeSmall, color = BrandGreen)
                 }
             }
+        }
         }
     }
 }

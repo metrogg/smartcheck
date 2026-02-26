@@ -26,87 +26,55 @@ fun HandOverlay(
     handInfos: List<HandInfo>,
     frameWidth: Int,
     frameHeight: Int,
+    viewWidth: Int,
+    viewHeight: Int,
     contentScale: ContentScale = ContentScale.Fit,
     mirrorX: Boolean,
     modifier: Modifier = Modifier
 ) {
-    if (frameWidth <= 0 || frameHeight <= 0) return
+    if (frameWidth <= 0 || frameHeight <= 0 || viewWidth <= 0 || viewHeight <= 0) return
+
+    val scaleMode = when (contentScale) {
+        ContentScale.Crop -> CoordinateScaleMode.Crop
+        else -> CoordinateScaleMode.Fit
+    }
+    val mapper = androidx.compose.runtime.remember(frameWidth, frameHeight, viewWidth, viewHeight, scaleMode, mirrorX) {
+        CoordinateMapper(
+            imageWidth = frameWidth,
+            imageHeight = frameHeight,
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
+            scaleMode = scaleMode,
+            mirrorX = mirrorX
+        )
+    }
+    val smoother = androidx.compose.runtime.remember { RectSmoother(alpha = 0.28f) }
 
     Canvas(modifier = modifier.fillMaxSize()) {
-
-        val frameWidthF = frameWidth.toFloat()
-        val frameHeightF = frameHeight.toFloat()
-
-        val scaleX = size.width / frameWidthF
-        val scaleY = size.height / frameHeightF
-
-        val (sx, sy, ox, oy) = when (contentScale) {
-            ContentScale.Fit -> {
-                val s = min(scaleX, scaleY)
-                val w = frameWidthF * s
-                val h = frameHeightF * s
-                val dx = (size.width - w) / 2f
-                val dy = (size.height - h) / 2f
-                listOf(s, s, dx, dy)
-            }
-            ContentScale.Crop -> {
-                val s = max(scaleX, scaleY)
-                val w = frameWidthF * s
-                val h = frameHeightF * s
-                val dx = (size.width - w) / 2f
-                val dy = (size.height - h) / 2f
-                listOf(s, s, dx, dy)
-            }
-            else -> listOf(scaleX, scaleY, 0f, 0f)
-        }
-
-        fun mapX(xRaw: Float): Float {
-            val xr = if (mirrorX) (frameWidthF - xRaw) else xRaw
-            return ox + xr * sx
-        }
-
-        fun mapY(yRaw: Float): Float {
-            return oy + yRaw * sy
-        }
-
         val cropScaleFactor = 1.5f
-        
+
         val textPaint = android.graphics.Paint().apply {
             color = android.graphics.Color.WHITE
             textSize = 40f
             style = android.graphics.Paint.Style.FILL
             setShadowLayer(2f, 0f, 0f, android.graphics.Color.BLACK)
         }
-        
+
         handInfos.forEach { hand ->
-            // 1. 确定颜色
             val color = if (hand.hasForeignObject) Color.Red else Color.Green
+            val mapped = smoother.update(mapper.mapRect(hand.box))
 
-            val leftRaw = hand.box.left
-            val rightRaw = hand.box.right
-            val topRaw = hand.box.top
-            val bottomRaw = hand.box.bottom
-
-            val x1 = mapX(leftRaw)
-            val x2 = mapX(rightRaw)
-            val left = min(x1, x2)
-            val right = max(x1, x2)
-            val top = mapY(topRaw)
-            val bottom = mapY(bottomRaw)
-            
-            // 2. 绘制检测框
             drawRect(
                 color = color,
-                topLeft = Offset(left, top),
-                size = Size(right - left, bottom - top),
+                topLeft = Offset(mapped.left, mapped.top),
+                size = Size(mapped.right - mapped.left, mapped.bottom - mapped.top),
                 style = Stroke(width = 3.dp.toPx())
             )
-            
-            // 3. 绘制标签
+
             drawContext.canvas.nativeCanvas.drawText(
                 "${hand.label} ${"%.2f".format(hand.score)}",
-                left,
-                top - 10f,
+                mapped.left,
+                mapped.top - 10f,
                 textPaint
             )
 
@@ -119,14 +87,12 @@ fun HandOverlay(
 
             val cropLeft = max(0, cx - newW / 2)
             val cropTop = max(0, cy - newH / 2)
-
             val cropLeftF = cropLeft.toFloat()
             val cropTopF = cropTop.toFloat()
 
             val foreignObjects: List<ForeignObjectInfo> = if (hand.foreignObjects.isNotEmpty()) {
                 hand.foreignObjects
             } else if (hand.hasForeignObject && hand.keyPoints.size >= 2) {
-                // Backward compatibility: legacy JNI encodes 1 foreign box in keyPoints[0..1].
                 val tl = hand.keyPoints[0]
                 val br = hand.keyPoints[1]
                 listOf(
@@ -146,24 +112,21 @@ fun HandOverlay(
                 val foreignRightRaw = cropLeftF + max(b.left, b.right)
                 val foreignTopRaw = cropTopF + min(b.top, b.bottom)
                 val foreignBottomRaw = cropTopF + max(b.top, b.bottom)
-
-                val fx1 = mapX(foreignLeftRaw)
-                val fx2 = mapX(foreignRightRaw)
-                val foreignLeft = min(fx1, fx2)
-                val foreignRight = max(fx1, fx2)
-                val foreignTop = mapY(foreignTopRaw)
-                val foreignBottom = mapY(foreignBottomRaw)
+                val foreignMapped = mapper.mapRect(android.graphics.RectF(
+                    foreignLeftRaw,
+                    foreignTopRaw,
+                    foreignRightRaw,
+                    foreignBottomRaw
+                ))
 
                 drawRect(
                     color = Color.Red,
-                    topLeft = Offset(foreignLeft, foreignTop),
-                    size = Size(foreignRight - foreignLeft, foreignBottom - foreignTop),
+                    topLeft = Offset(foreignMapped.left, foreignMapped.top),
+                    size = Size(foreignMapped.right - foreignMapped.left, foreignMapped.bottom - foreignMapped.top),
                     style = Stroke(width = 3.dp.toPx())
                 )
             }
 
-            // For the new JNI path keyPoints is already skeleton keypoints.
-            // For the legacy path (foreign box packed into first two points) skip them.
             val skeletonPoints = if (hand.foreignObjects.isEmpty() && hand.hasForeignObject && hand.keyPoints.size > 2) {
                 hand.keyPoints.subList(2, hand.keyPoints.size)
             } else {
@@ -173,17 +136,14 @@ fun HandOverlay(
             val mappedSkeletonPoints = skeletonPoints.map { point ->
                 val xRaw = cropLeftF + point.x
                 val yRaw = cropTopF + point.y
-                val x = mapX(xRaw)
-                val y = mapY(yRaw)
-                PointF(x, y)
+                val mappedPoint = mapper.mapRect(android.graphics.RectF(xRaw, yRaw, xRaw + 1f, yRaw + 1f))
+                PointF(mappedPoint.left, mappedPoint.top)
             }
-            
-            // 4. 绘制骨架 (关键点连线)
+
             if (mappedSkeletonPoints.isNotEmpty()) {
                 drawSkeleton(mappedSkeletonPoints, color)
             }
-            
-            // 5. 绘制关键点
+
             mappedSkeletonPoints.forEach { point ->
                 drawCircle(
                     color = Color.Yellow,

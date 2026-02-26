@@ -81,7 +81,6 @@ Troubleshooting:
 Notes:
 - No ktlint/detekt/spotless configured; use Android Studio formatting.
 - Avoid running tasks under `third_party/` unless intentionally working there.
-- Avoid committing large model binaries unless the repo already tracks them (Git LFS).
 
 ## Code Style Guidelines
 

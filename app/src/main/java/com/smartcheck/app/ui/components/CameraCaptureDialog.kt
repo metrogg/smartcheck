@@ -19,6 +19,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,73 +58,78 @@ fun CameraCaptureDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth(0.7f)
-                    .fillMaxHeight(0.8f),
-                color = Color.White,
-                shape = RoundedCornerShape(Dimens.CornerRadius)
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn() + scaleIn(initialScale = 0.96f)
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(Dimens.PaddingNormal),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "请对准摄像头并拍照",
-                            fontSize = Dimens.TextSizeNormal,
-                            color = Color.Black
-                        )
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "关闭"
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .background(Color.Black)
-                    ) {
-                        DualCameraPreview(
-                            modifier = Modifier.fillMaxSize(),
-                            preferredCameraId = cameraId,
-                            onFrameAnalyzed = { bitmap ->
-                                latestFrame = bitmap
-                            }
-                        )
-
-                        CaptureGuideOverlay(cameraId = cameraId)
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(Dimens.PaddingLarge),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        IconButton(
-                            onClick = {
-                                latestFrame?.let { frame ->
-                                    onCapture(frame)
-                                    onDismiss()
-                                }
-                            },
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .fillMaxHeight(0.8f),
+                    color = Color.White,
+                    shape = RoundedCornerShape(Dimens.CornerRadius)
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Row(
                             modifier = Modifier
-                                .size(72.dp)
-                                .background(BrandGreen, CircleShape)
+                                .fillMaxWidth()
+                                .padding(Dimens.PaddingNormal),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "拍照",
-                                tint = Color.White
+                            Text(
+                                text = "请对准摄像头并拍照",
+                                fontSize = Dimens.TextSizeNormal,
+                                color = Color.Black
                             )
+                            IconButton(onClick = onDismiss) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "关闭"
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .background(Color.Black)
+                        ) {
+                            DualCameraPreview(
+                                modifier = Modifier.fillMaxSize(),
+                                preferredCameraId = cameraId,
+                                onFrameAnalyzed = { bitmap ->
+                                    latestFrame = bitmap
+                                }
+                            )
+
+                            CaptureGuideOverlay(cameraId = cameraId)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(Dimens.PaddingLarge),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    latestFrame?.let { frame ->
+                                        onCapture(frame)
+                                        onDismiss()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .background(BrandGreen, CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = "拍照",
+                                    tint = Color.White
+                                )
+                            }
                         }
                     }
                 }

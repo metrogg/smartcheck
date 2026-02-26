@@ -20,6 +20,7 @@ import com.smartcheck.sdk.HandDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -80,6 +81,8 @@ class MainViewModel @Inject constructor(
     private val isHandStepProcessing = AtomicBoolean(false)
     private var handOkFrames = 0
     private var handStepStartAt = 0L
+    private var handCooldownJob: Job? = null
+    private var autoSubmitJob: Job? = null
 
     private var currentFacePath: String? = null
     private var currentPalmPath: String? = null
@@ -88,9 +91,13 @@ class MainViewModel @Inject constructor(
     private var currentPalmBitmap: Bitmap? = null
     private var currentBackBitmap: Bitmap? = null
     private var lastFaceFrameAt: Long = 0L
+    private var lastFaceDetectAt: Long = 0L
+    private var faceDetectJob: Job? = null
     private var faceSaveJob: Job? = null
     private var palmSaveJob: Job? = null
     private var backSaveJob: Job? = null
+
+    private val minFreeBytes = 200L * 1024L * 1024L
 
     private val isRockchip: Boolean = run {
         val hardware = Build.HARDWARE.lowercase()
@@ -168,11 +175,24 @@ class MainViewModel @Inject constructor(
             _faceDetectionBoxes.value = emptyList()
             return
         }
-        
-        viewModelScope.launch {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastFaceDetectAt < 150L) {
+            frame.safeRecycle()
+            return
+        }
+        if (faceDetectJob?.isActive == true) {
+            frame.safeRecycle()
+            return
+        }
+        lastFaceDetectAt = now
+
+        faceDetectJob = viewModelScope.launch {
+            val safeBitmap = frame.copy(Bitmap.Config.ARGB_8888, true)
             try {
                 val startAt = SystemClock.elapsedRealtime()
-                val result = faceEngine.detectAndRecognize(frame)
+                val result = withContext(NonCancellable) {
+                    faceEngine.detectAndRecognize(safeBitmap)
+                }
                 val elapsed = SystemClock.elapsedRealtime() - startAt
                 _perfMetrics.update { it.copy(faceDuration = elapsed.milliseconds) }
                 _faceDetectionBoxes.value = if (result != null && !result.boundingBox.isEmpty) {
@@ -183,9 +203,16 @@ class MainViewModel @Inject constructor(
 
                 if (result != null && result.userId != null) {
                     onFaceRecognized(result.userId, result.userName ?: "未知用户", result.confidence)
+                } else {
+                    _uiState.update { it.copy(message = "请正视摄像头") }
                 }
+            } catch (e: CancellationException) {
+                // Normal control flow
             } catch (e: Exception) {
                 Timber.e(e, "Face recognition error")
+            } finally {
+                safeBitmap.safeRecycle()
+                frame.safeRecycle()
             }
         }
     }
@@ -223,10 +250,22 @@ class MainViewModel @Inject constructor(
                 val bitmap = currentFaceBitmap ?: return@launch
                 val safeBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 val filename = "face_${System.currentTimeMillis()}.jpg"
-                val name = FileUtil.saveBitmapToInternal(appContext, safeBitmap, filename)
-                currentFacePath = name
-                _uiState.update { it.copy(faceImagePath = name) }
-                safeBitmap.recycle()
+                val available = appContext.filesDir.usableSpace
+                if (available < minFreeBytes) {
+                    safeBitmap.safeRecycle()
+                    _uiState.update { it.copy(message = "存储空间不足，无法保存照片") }
+                    return@launch
+                }
+                val result = FileUtil.saveBitmapToInternalResult(appContext, safeBitmap, filename)
+                result.onSuccess { name ->
+                    currentFacePath = name
+                    _uiState.update { it.copy(faceImagePath = name) }
+                }.onFailure {
+                    _uiState.update { it.copy(message = "照片保存失败") }
+                }
+                safeBitmap.safeRecycle()
+                currentFaceBitmap.safeRecycle()
+                currentFaceBitmap = null
             } catch (e: Exception) {
                 Timber.e(e, "Failed to save face snapshot")
             }
@@ -337,7 +376,8 @@ class MainViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 state = CheckState.SYMPTOM_CHECKING,
-                message = "请回答健康询问"
+                message = "请回答健康询问",
+                autoSubmitRemainingSec = null
             )
         }
         voicePrompter.speak("请回答健康询问")
@@ -378,7 +418,8 @@ class MainViewModel @Inject constructor(
             it.copy(
                 state = CheckState.ALL_PASS,
                 message = "晨检通过！",
-                symptomFlags = remark
+                symptomFlags = remark,
+                autoSubmitRemainingSec = null
             )
         }
 
@@ -389,23 +430,9 @@ class MainViewModel @Inject constructor(
         // 记录由 finalizeCheckRecord() 统一提交
     }
 
-    fun confirmHandFront(issues: List<String>) {
-        if (_uiState.value.state != CheckState.HAND_PALM_CHECKING) return
-        if (issues.isNotEmpty()) {
-            onHandCheckFail(issues)
-        } else {
-            startHandBackCheck()
-        }
-    }
+    fun confirmHandFront(issues: List<String>) = Unit
 
-    fun confirmHandBack(issues: List<String>) {
-        if (_uiState.value.state != CheckState.HAND_BACK_CHECKING) return
-        if (issues.isNotEmpty()) {
-            onHandCheckFail(issues)
-        } else {
-            onHandCheckPass()
-        }
-    }
+    fun confirmHandBack(issues: List<String>) = Unit
 
     private fun onSymptomFail(symptoms: List<String>) {
         val summary = symptoms.joinToString(", ")
@@ -428,6 +455,7 @@ class MainViewModel @Inject constructor(
         if (state.isSubmitting || state.isRecordFinalized) return
         if (state.currentUserId == null) return
         if (state.state == CheckState.SYMPTOM_CHECKING) return
+        if (state.handHasIssue) return
 
         val isPassed = state.state == CheckState.ALL_PASS
         val isTempNormal = state.state != CheckState.TEMP_FAIL
@@ -490,6 +518,7 @@ class MainViewModel @Inject constructor(
         _handDetectionState.value = emptyList()
         currentPalmPath = null
         currentBackPath = null
+        handCooldownJob?.cancel()
         _faceDetectionBoxes.value = emptyList()
 
         _uiState.update {
@@ -497,7 +526,9 @@ class MainViewModel @Inject constructor(
                 state = CheckState.HAND_PALM_CHECKING,
                 message = "请将手心对准摄像头",
                 handPalmPath = null,
-                handBackPath = null
+                handBackPath = null,
+                handPalmInfos = emptyList(),
+                handBackInfos = emptyList()
             )
         }
 
@@ -508,6 +539,7 @@ class MainViewModel @Inject constructor(
         handOkFrames = 0
         handStepStartAt = System.currentTimeMillis()
         _handDetectionState.value = emptyList()
+        handCooldownJob?.cancel()
 
         _uiState.update {
             it.copy(
@@ -522,6 +554,7 @@ class MainViewModel @Inject constructor(
     private fun processHandStepFrame(frame: Bitmap) {
         val state = _uiState.value.state
         if (state != CheckState.HAND_PALM_CHECKING && state != CheckState.HAND_BACK_CHECKING) return
+        if (handCooldownJob?.isActive == true) return
         if (!isHandStepProcessing.compareAndSet(false, true)) return
 
         viewModelScope.launch {
@@ -530,9 +563,9 @@ class MainViewModel @Inject constructor(
                 if (!isRockchip) {
                     if (now - handStepStartAt >= 800L) {
                         if (state == CheckState.HAND_PALM_CHECKING) {
-                            startHandBackCheck()
+                            captureHandPalmAndCooldown(frame, emptyList())
                         } else {
-                            onHandCheckPass()
+                            captureHandBackAndFinish(frame, emptyList())
                         }
                     }
                     return@launch
@@ -549,52 +582,48 @@ class MainViewModel @Inject constructor(
                 }
 
                 val hasForeignObject = results.any { it.hasForeignObject }
-                if (hasForeignObject) {
-                    val issues = results.filter { it.hasForeignObject }.map { it.label }.ifEmpty { results.map { it.label } }
-                    onHandCheckFail(issues)
+                val hasIssueSoFar = hasForeignObject || _uiState.value.handHasIssue
+                if (hasIssueSoFar) {
+                    val issues = if (hasForeignObject) {
+                        results.filter { it.hasForeignObject }.map { it.label }.ifEmpty { results.map { it.label } }
+                    } else {
+                        _uiState.value.handDetectionResults
+                    }
+                    _uiState.update {
+                        if (state == CheckState.HAND_PALM_CHECKING) {
+                            it.copy(
+                                handPalmInfos = results,
+                                handPalmFrameWidth = frame.width,
+                                handPalmFrameHeight = frame.height,
+                                handHasIssue = true,
+                                handDetectionResults = issues
+                            )
+                        } else {
+                            it.copy(
+                                handBackInfos = results,
+                                handBackFrameWidth = frame.width,
+                                handBackFrameHeight = frame.height,
+                                handHasIssue = true,
+                                handDetectionResults = issues
+                            )
+                        }
+                    }
+                    if (state == CheckState.HAND_PALM_CHECKING) {
+                        captureHandPalmAndCooldown(frame, results, isIssue = true)
+                    } else {
+                        captureHandBackAndFinish(frame, results, issues, isIssue = true)
+                    }
                     return@launch
                 }
 
                 handOkFrames++
                 if (handOkFrames >= 3) {
                     if (state == CheckState.HAND_PALM_CHECKING) {
-                        hardwareRepository.beep("success")
-                        if (currentPalmBitmap == null) {
-                            currentPalmBitmap = frame.copy(Bitmap.Config.ARGB_8888, false)
-                            palmSaveJob?.cancel()
-                            palmSaveJob = viewModelScope.launch(Dispatchers.IO) {
-                                try {
-                                    val filename = "hand_palm_${System.currentTimeMillis()}.jpg"
-                                    val safeBitmap = currentPalmBitmap?.copy(Bitmap.Config.ARGB_8888, false) ?: return@launch
-                                    val name = FileUtil.saveBitmapToInternal(appContext, safeBitmap, filename)
-                                    currentPalmPath = name
-                                    _uiState.update { it.copy(handPalmPath = name) }
-                                    safeBitmap.recycle()
-                                } catch (e: Exception) {
-                                    Timber.e(e, "Failed to save hand palm snapshot")
-                                }
-                            }
-                        }
-                        startHandBackCheck()
+                        captureHandPalmAndCooldown(frame, results)
                     } else {
-                        hardwareRepository.beep("success")
-                        if (currentBackBitmap == null) {
-                            currentBackBitmap = frame.copy(Bitmap.Config.ARGB_8888, false)
-                            backSaveJob?.cancel()
-                            backSaveJob = viewModelScope.launch(Dispatchers.IO) {
-                                try {
-                                    val filename = "hand_back_${System.currentTimeMillis()}.jpg"
-                                    val safeBitmap = currentBackBitmap?.copy(Bitmap.Config.ARGB_8888, false) ?: return@launch
-                                    val name = FileUtil.saveBitmapToInternal(appContext, safeBitmap, filename)
-                                    currentBackPath = name
-                                    _uiState.update { it.copy(handBackPath = name) }
-                                    safeBitmap.recycle()
-                                } catch (e: Exception) {
-                                    Timber.e(e, "Failed to save hand back snapshot")
-                                }
-                            }
-                        }
-                        onHandCheckPass()
+                        val issues = _uiState.value.handDetectionResults
+                        val hasPriorIssue = _uiState.value.handHasIssue
+                        captureHandBackAndFinish(frame, results, issues, isIssue = hasPriorIssue)
                     }
                 }
             } catch (e: Exception) {
@@ -602,6 +631,7 @@ class MainViewModel @Inject constructor(
                 onHandCheckFail(listOf("检测异常"))
             } finally {
                 isHandStepProcessing.set(false)
+                frame.safeRecycle()
             }
         }
     }
@@ -682,9 +712,11 @@ class MainViewModel @Inject constructor(
      */
     fun reset() {
         Timber.d("Resetting state machine")
-        
+
         tempMeasureJob?.cancel()
         resetJob?.cancel()
+        handCooldownJob?.cancel()
+        autoSubmitJob?.cancel()
         
         _uiState.update {
             UiState(
@@ -701,6 +733,9 @@ class MainViewModel @Inject constructor(
         currentFacePath = null
         currentPalmPath = null
         currentBackPath = null
+        currentFaceBitmap.safeRecycle()
+        currentPalmBitmap.safeRecycle()
+        currentBackBitmap.safeRecycle()
         currentFaceBitmap = null
         currentPalmBitmap = null
         currentBackBitmap = null
@@ -710,6 +745,150 @@ class MainViewModel @Inject constructor(
         faceSaveJob = null
         palmSaveJob = null
         backSaveJob = null
+    }
+
+    private fun captureHandPalmAndCooldown(
+        frame: Bitmap,
+        infos: List<com.smartcheck.sdk.HandInfo>,
+        isIssue: Boolean = false
+    ) {
+        if (isIssue) {
+            hardwareRepository.beep("error")
+        } else {
+            hardwareRepository.beep("success")
+        }
+        if (currentPalmBitmap == null) {
+            val snapshot = frame.copy(Bitmap.Config.ARGB_8888, false)
+            currentPalmBitmap = snapshot
+            _uiState.update {
+                it.copy(
+                    handPalmInfos = infos,
+                    handPalmFrameWidth = frame.width,
+                    handPalmFrameHeight = frame.height,
+                    handCapturePulse = true
+                )
+            }
+            viewModelScope.launch {
+                delay(180)
+                _uiState.update { it.copy(handCapturePulse = false) }
+            }
+            palmSaveJob?.cancel()
+            palmSaveJob = viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val filename = "hand_palm_${System.currentTimeMillis()}.jpg"
+                    val safeBitmap = snapshot?.copy(Bitmap.Config.ARGB_8888, false) ?: return@launch
+                    val available = appContext.filesDir.usableSpace
+                    if (available < minFreeBytes) {
+                        safeBitmap.safeRecycle()
+                        _uiState.update { it.copy(message = "存储空间不足，无法保存照片") }
+                        return@launch
+                    }
+                    val result = FileUtil.saveBitmapToInternalResult(appContext, safeBitmap, filename)
+                    result.onSuccess { name ->
+                        currentPalmPath = name
+                        _uiState.update { it.copy(handPalmPath = name) }
+                    }.onFailure {
+                        _uiState.update { it.copy(message = "照片保存失败") }
+                    }
+                    safeBitmap.safeRecycle()
+                    currentPalmBitmap.safeRecycle()
+                    currentPalmBitmap = null
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to save hand palm snapshot")
+                }
+            }
+        }
+
+        handCooldownJob?.cancel()
+        handCooldownJob = viewModelScope.launch {
+            delay(2500)
+            startHandBackCheck()
+        }
+    }
+
+    private fun captureHandBackAndFinish(
+        frame: Bitmap,
+        infos: List<com.smartcheck.sdk.HandInfo>,
+        issues: List<String> = emptyList(),
+        isIssue: Boolean = false
+    ) {
+        if (!isIssue) {
+            hardwareRepository.beep("success")
+        }
+        if (currentBackBitmap == null) {
+            val snapshot = frame.copy(Bitmap.Config.ARGB_8888, false)
+            currentBackBitmap = snapshot
+            _uiState.update {
+                it.copy(
+                    handBackInfos = infos,
+                    handBackFrameWidth = frame.width,
+                    handBackFrameHeight = frame.height,
+                    handCapturePulse = true
+                )
+            }
+            viewModelScope.launch {
+                delay(180)
+                _uiState.update { it.copy(handCapturePulse = false) }
+            }
+            backSaveJob?.cancel()
+            backSaveJob = viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val filename = "hand_back_${System.currentTimeMillis()}.jpg"
+                    val safeBitmap = snapshot?.copy(Bitmap.Config.ARGB_8888, false) ?: return@launch
+                    val available = appContext.filesDir.usableSpace
+                    if (available < minFreeBytes) {
+                        safeBitmap.safeRecycle()
+                        _uiState.update { it.copy(message = "存储空间不足，无法保存照片") }
+                        return@launch
+                    }
+                    val result = FileUtil.saveBitmapToInternalResult(appContext, safeBitmap, filename)
+                    result.onSuccess { name ->
+                        currentBackPath = name
+                        _uiState.update { it.copy(handBackPath = name) }
+                    }.onFailure {
+                        _uiState.update { it.copy(message = "照片保存失败") }
+                    }
+                    safeBitmap.safeRecycle()
+                    currentBackBitmap.safeRecycle()
+                    currentBackBitmap = null
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to save hand back snapshot")
+                }
+            }
+        }
+        if (isIssue) {
+            _uiState.update {
+                it.copy(
+                    state = CheckState.SYMPTOM_CHECKING,
+                    message = "手部检测异常，请人工复核",
+                    autoSubmitRemainingSec = null
+                )
+            }
+        } else {
+            startAutoSubmitCountdown()
+        }
+    }
+
+    private fun startAutoSubmitCountdown() {
+        autoSubmitJob?.cancel()
+        val totalSec = 3
+        _uiState.update {
+            it.copy(
+                state = CheckState.AUTO_SUBMITTING,
+                message = "即将自动提交",
+                autoSubmitRemainingSec = totalSec,
+                autoSubmitTotalSec = totalSec
+            )
+        }
+        autoSubmitJob = viewModelScope.launch {
+            for (sec in totalSec downTo 1) {
+                _uiState.update { it.copy(autoSubmitRemainingSec = sec) }
+                delay(1000)
+            }
+            autoSubmitJob = null
+            onAllPass(remark = "无")
+            finalizeCheckRecord()
+        }
     }
 
     private fun calcRemainingDays(endAt: Long): Int {
@@ -722,7 +901,19 @@ class MainViewModel @Inject constructor(
         super.onCleared()
         tempMeasureJob?.cancel()
         resetJob?.cancel()
+        handCooldownJob?.cancel()
+        autoSubmitJob?.cancel()
         voicePrompter.shutdown()
         Timber.d("MainViewModel cleared")
+    }
+
+    private fun Bitmap?.safeRecycle() {
+        try {
+            if (this != null && !isRecycled) {
+                recycle()
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Bitmap recycle failed")
+        }
     }
 }

@@ -31,6 +31,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,9 +41,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.smartcheck.app.ui.theme.BrandGreen
 import com.smartcheck.app.ui.theme.BrandLightGreen
 import com.smartcheck.app.ui.theme.Dimens
+import com.smartcheck.app.viewmodel.SettingsViewModel
 
 @Composable
 fun DashboardScreen(
@@ -49,8 +54,13 @@ fun DashboardScreen(
     onNavigateEmployees: () -> Unit,
     onNavigateRecords: () -> Unit,
     onNavigateExport: () -> Unit,
-    onNavigateSettings: () -> Unit
+    onNavigateSettings: () -> Unit,
+    settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val canteenName by settingsViewModel.canteenName.collectAsState()
+    val adminAvatar by settingsViewModel.adminAvatar.collectAsState()
+    val adminName by settingsViewModel.adminName.collectAsState()
+    val displayName = if (canteenName.isBlank()) "上海交通大学荔园三食堂" else canteenName
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -60,19 +70,38 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "欢迎进入 上海交通大学荔园三食堂",
-                color = BrandGreen,
-                fontSize = Dimens.TextSizeNormal,
-                modifier = Modifier.padding(start = 16.dp)
-            )
-            IconButton(onClick = onNavigateSettings) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "设置",
-                    tint = BrandGreen,
-                    modifier = Modifier.size(28.dp)
+            Column(modifier = Modifier.padding(start = 16.dp)) {
+                Text(
+                    text = "欢迎进入 $displayName",
+                    color = BrandGreen,
+                    fontSize = Dimens.TextSizeNormal
                 )
+                if (adminName.isNotBlank()) {
+                    Text(
+                        text = adminName,
+                        color = Color(0xFF6B7280),
+                        fontSize = Dimens.TextSizeSmall
+                    )
+                }
+            }
+            IconButton(onClick = onNavigateSettings) {
+                if (adminAvatar.isNotBlank()) {
+                    AsyncImage(
+                        model = adminAvatar,
+                        contentDescription = "设置",
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(Color(0xFFE5E7EB), CircleShape),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "设置",
+                        tint = BrandGreen,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
         Divider(color = MaterialTheme.colorScheme.outlineVariant)

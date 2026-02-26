@@ -25,6 +25,16 @@ object FileUtil {
         return file.name
     }
 
+    fun saveBitmapToInternalResult(context: Context, bitmap: Bitmap, filename: String): Result<String> {
+        return runCatching {
+            val file = File(getRecordsDir(context), filename)
+            FileOutputStream(file).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            }
+            file.name
+        }
+    }
+
     fun getRecordImageFile(context: Context, pathOrName: String?): File? {
         if (pathOrName.isNullOrBlank()) return null
         return if (pathOrName.startsWith("/")) {

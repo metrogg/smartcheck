@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.YuvImage
+import android.util.Rational
 import android.util.Size
 import android.view.Surface
 import androidx.camera.camera2.interop.Camera2CameraInfo
@@ -98,6 +99,7 @@ fun DualCameraPreview(
                     }
 
                 val useCases = mutableListOf<UseCase>(preview)
+                val useCaseGroupBuilder = UseCaseGroup.Builder()
 
                 if (enableAnalysis) {
                     val imageAnalysis = ImageAnalysis.Builder()
@@ -121,11 +123,17 @@ fun DualCameraPreview(
                     useCases.add(imageAnalysis)
                 }
 
+                val viewPort = ViewPort.Builder(Rational(16, 9), rotation)
+                    .setScaleType(ViewPort.FIT)
+                    .build()
+                useCaseGroupBuilder.setViewPort(viewPort)
+                useCases.forEach { useCaseGroupBuilder.addUseCase(it) }
+
                 provider.unbindAll()
                 val camera = provider.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,
-                    *useCases.toTypedArray()
+                    useCaseGroupBuilder.build()
                 )
 
                 val cameraId = try {
@@ -216,8 +224,21 @@ private fun buildCameraSelector(
 
 private fun processImageProxy(imageProxy: ImageProxy, onFrameAnalyzed: (Bitmap) -> Unit) {
     try {
-        val bitmap = imageProxy.toBitmapCompat()
-        val rotatedBitmap = rotateBitmap(bitmap, imageProxy.imageInfo.rotationDegrees.toFloat())
+        val baseBitmap = imageProxy.toBitmapCompat()
+        val cropRect = imageProxy.cropRect
+        val croppedBitmap = if (cropRect.left != 0 || cropRect.top != 0 ||
+            cropRect.right != baseBitmap.width || cropRect.bottom != baseBitmap.height
+        ) {
+            val safeWidth = cropRect.width().coerceAtMost(baseBitmap.width - cropRect.left)
+            val safeHeight = cropRect.height().coerceAtMost(baseBitmap.height - cropRect.top)
+            Bitmap.createBitmap(baseBitmap, cropRect.left, cropRect.top, safeWidth, safeHeight)
+        } else {
+            baseBitmap
+        }
+        if (croppedBitmap !== baseBitmap) {
+            baseBitmap.recycle()
+        }
+        val rotatedBitmap = rotateBitmap(croppedBitmap, imageProxy.imageInfo.rotationDegrees.toFloat())
         onFrameAnalyzed(rotatedBitmap)
     } catch (e: Exception) {
         Timber.e(e, "Failed to process image")

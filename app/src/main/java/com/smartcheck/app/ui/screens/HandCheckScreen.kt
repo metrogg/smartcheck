@@ -353,6 +353,8 @@ fun HandCheckScreen(
                                             handInfos = handInfos,
                                             frameWidth = lastFrameWidth,
                                             frameHeight = lastFrameHeight,
+                                            viewWidth = lastFrameWidth,
+                                            viewHeight = lastFrameHeight,
                                             contentScale = ContentScale.Fit,
                                             mirrorX = cameraLensFacing == CameraSelector.LENS_FACING_FRONT,
                                             modifier = Modifier.fillMaxSize()

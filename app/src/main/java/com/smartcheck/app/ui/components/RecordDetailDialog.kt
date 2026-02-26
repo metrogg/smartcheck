@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
@@ -30,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
@@ -54,131 +58,136 @@ fun RecordDetailDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxSize(0.85f),
-            shape = RoundedCornerShape(Dimens.CornerRadius),
-            color = Color.White
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn() + scaleIn(initialScale = 0.96f)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Dimens.PaddingNormal),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "晨检记录详情",
-                        fontSize = Dimens.TextSizeTitle,
-                        color = Color.Black
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "关闭"
-                        )
-                    }
-                }
-
-                Row(modifier = Modifier.fillMaxSize()) {
-                    Column(
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize(0.85f),
+                shape = RoundedCornerShape(Dimens.CornerRadius),
+                color = Color.White
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
                         modifier = Modifier
-                            .weight(0.6f)
-                            .fillMaxSize()
-                            .background(Color(0xFFF4F6F8))
+                            .fillMaxWidth()
                             .padding(Dimens.PaddingNormal),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.PaddingNormal)
-                    ) {
-                        val faceFile = FileUtil.getRecordImageFile(context, record.faceImagePath)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AsyncImage(
-                                model = faceFile,
-                                contentDescription = "人脸抓拍",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
-                        Text(
-                            text = "人脸抓拍",
-                            fontSize = Dimens.TextSizeSmall,
-                            color = Color(0xFF6B7280)
-                        )
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingNormal)
-                        ) {
-                            val palmFile = FileUtil.getRecordImageFile(context, record.handPalmPath)
-                            val backFile = FileUtil.getRecordImageFile(context, record.handBackPath)
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                AsyncImage(
-                                    model = palmFile,
-                                    contentDescription = "手心",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f),
-                                    contentScale = ContentScale.Fit
-                                )
-                                Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
-                                Text(text = "手心", fontSize = Dimens.TextSizeSmall, color = Color(0xFF6B7280))
-                            }
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                AsyncImage(
-                                    model = backFile,
-                                    contentDescription = "手背",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f),
-                                    contentScale = ContentScale.Fit
-                                )
-                                Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
-                                Text(text = "手背", fontSize = Dimens.TextSizeSmall, color = Color(0xFF6B7280))
-                            }
-                        }
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .weight(0.4f)
-                            .fillMaxSize()
-                            .background(BrandLightGreen)
-                            .padding(Dimens.PaddingLarge)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.PaddingNormal)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = dateFormat.format(Date(record.checkTime)),
-                            fontSize = Dimens.TextSizeNormal,
+                            text = "晨检记录详情",
+                            fontSize = Dimens.TextSizeTitle,
                             color = Color.Black
                         )
-                        InfoRow(label = "姓名", value = record.userName)
-                        InfoRow(label = "工号", value = record.employeeId.ifBlank { "--" })
-                        val tempText = String.format(Locale.getDefault(), "%.1f℃", record.temperature)
-                        InfoRow(
-                            label = "体温",
-                            value = tempText,
-                            valueColor = if (record.temperature >= 37.3f) MaterialTheme.colorScheme.error else BrandGreen
-                        )
-                        val symptomValue = record.symptomFlags.ifBlank { "无" }
-                        InfoRow(
-                            label = "症状",
-                            value = symptomValue,
-                            valueColor = if (symptomValue == "无") BrandGreen else MaterialTheme.colorScheme.error
-                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "关闭"
+                            )
+                        }
+                    }
+
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            modifier = Modifier
+                                .weight(0.6f)
+                                .fillMaxSize()
+                                .background(Color(0xFFF4F6F8))
+                                .padding(Dimens.PaddingNormal),
+                            verticalArrangement = Arrangement.spacedBy(Dimens.PaddingNormal)
+                        ) {
+                            val faceFile = FileUtil.getRecordImageFile(context, record.faceImagePath)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AsyncImage(
+                                    model = faceFile,
+                                    contentDescription = "人脸抓拍",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                            Text(
+                                text = "人脸抓拍",
+                                fontSize = Dimens.TextSizeSmall,
+                                color = Color(0xFF6B7280)
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingNormal)
+                            ) {
+                                val palmFile = FileUtil.getRecordImageFile(context, record.handPalmPath)
+                                val backFile = FileUtil.getRecordImageFile(context, record.handBackPath)
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    AsyncImage(
+                                        model = palmFile,
+                                        contentDescription = "手心",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .weight(1f),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                    Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+                                    Text(text = "手心", fontSize = Dimens.TextSizeSmall, color = Color(0xFF6B7280))
+                                }
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    AsyncImage(
+                                        model = backFile,
+                                        contentDescription = "手背",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .weight(1f),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                    Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+                                    Text(text = "手背", fontSize = Dimens.TextSizeSmall, color = Color(0xFF6B7280))
+                                }
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .weight(0.4f)
+                                .fillMaxSize()
+                                .background(BrandLightGreen)
+                                .padding(Dimens.PaddingLarge)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(Dimens.PaddingNormal)
+                        ) {
+                            Text(
+                                text = dateFormat.format(Date(record.checkTime)),
+                                fontSize = Dimens.TextSizeNormal,
+                                color = Color.Black
+                            )
+                            InfoRow(label = "姓名", value = record.userName)
+                            InfoRow(label = "工号", value = record.employeeId.ifBlank { "--" })
+                            val tempText = String.format(Locale.getDefault(), "%.1f℃", record.temperature)
+                            InfoRow(
+                                label = "体温",
+                                value = tempText,
+                                valueColor = if (record.temperature >= 37.3f) MaterialTheme.colorScheme.error else BrandGreen
+                            )
+                            val symptomValue = record.symptomFlags.ifBlank { "无" }
+                            InfoRow(
+                                label = "症状",
+                                value = symptomValue,
+                                valueColor = if (symptomValue == "无") BrandGreen else MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }
@@ -193,7 +202,7 @@ private fun InfoRow(label: String, value: String, valueColor: Color = Color.Blac
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, fontSize = Dimens.TextSizeSmall, color = Color(0xFF6B7280))
-        Text(text = value, fontSize = Dimens.TextSizeNormal, color = valueColor)
+        Text(text = "$label：", fontSize = Dimens.TextSizeSmall, color = Color.Gray)
+        Text(text = value, fontSize = Dimens.TextSizeNormal, color = valueColor, fontWeight = FontWeight.SemiBold)
     }
 }
