@@ -288,11 +288,6 @@ fun HomeScreen(
                         mirrorX = isMirrored,
                         modifier = Modifier.fillMaxSize()
                     )
-                    HandGuideOverlay(
-                        hasDetection = handInfos.isNotEmpty(),
-                        isCaptured = uiState.handCapturePulse,
-                        modifier = Modifier.fillMaxSize()
-                    )
                 }
 
                 ScannerFrameOverlay()
@@ -417,12 +412,18 @@ fun HomeScreen(
 
             Column(modifier = Modifier.weight(1f)) {
                 val context = LocalContext.current
+                val handThumbAspectRatio = 16f / 9f
 
                 Row(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.weight(0.5f).padding(end = 8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(0.5f)
+                            .padding(end = 8.dp)
+                            .aspectRatio(handThumbAspectRatio)
+                    ) {
                         val palmFile = FileUtil.getRecordImageFile(context, uiState.handPalmPath)?.takeIf { it.exists() }
                         val palmModel = palmFile ?: handFrontShot
                         if (palmModel != null) {
@@ -430,6 +431,12 @@ fun HomeScreen(
                                 model = palmModel,
                                 contentDescription = "手心",
                                 contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            PlaceholderHandTile(
+                                title = "手心",
+                                hint = if (uiState.state == CheckState.HAND_PALM_CHECKING) "请对准手心" else "等待拍摄",
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -485,7 +492,12 @@ fun HomeScreen(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.weight(0.5f).padding(end = 8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(0.5f)
+                            .padding(end = 8.dp)
+                            .aspectRatio(handThumbAspectRatio)
+                    ) {
                         val backFile = FileUtil.getRecordImageFile(context, uiState.handBackPath)?.takeIf { it.exists() }
                         val backModel = backFile ?: handBackShot
                         if (backModel != null) {
@@ -493,6 +505,12 @@ fun HomeScreen(
                                 model = backModel,
                                 contentDescription = "手背",
                                 contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            PlaceholderHandTile(
+                                title = "手背",
+                                hint = if (uiState.state == CheckState.HAND_BACK_CHECKING) "请对准手背" else "等待拍摄",
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -1022,6 +1040,26 @@ private fun ScannerFrameOverlay() {
 
 private fun formatTemp(temp: Float): String {
     return if (temp == 0f) "读取中..." else "%.1f°C".format(temp)
+}
+
+@Composable
+private fun PlaceholderHandTile(
+    title: String,
+    hint: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFE5E7EB)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Color(0xFF374151))
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(text = hint, fontSize = Dimens.TextSizeSmall, color = Color(0xFF6B7280))
+        }
+    }
 }
 
 private fun formatHealthCert(days: Int?): String {

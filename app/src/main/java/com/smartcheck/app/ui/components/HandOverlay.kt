@@ -64,15 +64,25 @@ fun HandOverlay(
         }
 
         handInfos.forEach { hand ->
-            val color = if (hand.hasForeignObject) Color.Red else Color.Green
+            val color = if (hand.hasForeignObject) Color(0xFFFF6B6B) else Color(0xFF3DDC84)
             val smoother = smootherMap.getOrPut(hand.id) { RectSmoother(alpha = 0.28f) }
             val mapped = smoother.update(mapper.mapRect(hand.box))
+            val rectSize = Size(mapped.right - mapped.left, mapped.bottom - mapped.top)
+            val corner = min(rectSize.width, rectSize.height) * 0.08f
 
-            drawRect(
+            drawRoundRect(
+                color = color.copy(alpha = 0.18f),
+                topLeft = Offset(mapped.left, mapped.top),
+                size = rectSize,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner),
+                style = Stroke(width = 6.dp.toPx())
+            )
+            drawRoundRect(
                 color = color,
                 topLeft = Offset(mapped.left, mapped.top),
-                size = Size(mapped.right - mapped.left, mapped.bottom - mapped.top),
-                style = Stroke(width = 3.dp.toPx())
+                size = rectSize,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner),
+                style = Stroke(width = 2.dp.toPx())
             )
 
             drawContext.canvas.nativeCanvas.drawText(
