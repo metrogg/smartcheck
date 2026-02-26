@@ -48,7 +48,10 @@ fun HandOverlay(
             mirrorX = mirrorX
         )
     }
-    val smoother = androidx.compose.runtime.remember { RectSmoother(alpha = 0.28f) }
+    val smootherMap = androidx.compose.runtime.remember { mutableMapOf<Int, RectSmoother>() }
+    val currentIds = androidx.compose.runtime.remember(handInfos) { handInfos.map { it.id }.toSet() }
+    val staleIds = smootherMap.keys.filter { it !in currentIds }
+    staleIds.forEach { smootherMap.remove(it) }
 
     Canvas(modifier = modifier.fillMaxSize()) {
         val cropScaleFactor = 1.5f
@@ -62,6 +65,7 @@ fun HandOverlay(
 
         handInfos.forEach { hand ->
             val color = if (hand.hasForeignObject) Color.Red else Color.Green
+            val smoother = smootherMap.getOrPut(hand.id) { RectSmoother(alpha = 0.28f) }
             val mapped = smoother.update(mapper.mapRect(hand.box))
 
             drawRect(
