@@ -290,6 +290,18 @@ fun HomeScreen(
                     )
                 }
 
+                val statusText = when {
+                    cameraInitState != com.smartcheck.app.ui.components.CameraInitState.Ready -> if (isHandStage) "正在初始化手部相机..." else "正在初始化人脸相机..."
+                    showTransitionMask -> "正在切换相机..."
+                    else -> uiState.message.ifBlank { "请正视摄像头" }
+                }
+                StatusBadge(
+                    text = statusText,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(Dimens.PaddingNormal)
+                )
+
                 ScannerFrameOverlay()
 
                 if (cameraInitState == com.smartcheck.app.ui.components.CameraInitState.Error) {
@@ -321,12 +333,20 @@ fun HomeScreen(
                             .background(Color.Black.copy(alpha = 0.5f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "正在寻找相机...",
-                            color = Color.White,
-                            fontSize = Dimens.TextSizeNormal,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "正在初始化相机...",
+                                color = Color.White,
+                                fontSize = Dimens.TextSizeNormal,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+                            Text(
+                                text = if (isHandStage) "即将开始手部识别" else "即将开始人脸识别",
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = Dimens.TextSizeSmall
+                            )
+                        }
                     }
                 }
 
@@ -365,7 +385,11 @@ fun HomeScreen(
                         modifier = Modifier
                             .fillMaxHeight()
                             .aspectRatio(1f)
-                            .clip(RoundedCornerShape(8.dp)),
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = rememberRipple(bounded = true)
+                            ) { viewModel.retakeFace() },
                         contentScale = ContentScale.Crop,
                         contentDescription = "头像"
                     )
@@ -375,7 +399,11 @@ fun HomeScreen(
                             .fillMaxHeight()
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFFE5E7EB)),
+                            .background(Color(0xFFE5E7EB))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = rememberRipple(bounded = true)
+                            ) { viewModel.retakeFace() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -407,7 +435,17 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "手部检测", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "手部检测", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                val handStageLabel = when (uiState.state) {
+                    CheckState.HAND_PALM_CHECKING -> "当前：手心"
+                    CheckState.HAND_BACK_CHECKING -> "当前：手背"
+                    CheckState.AUTO_SUBMITTING, CheckState.ALL_PASS -> "已完成"
+                    else -> "待开始"
+                }
+                Text(text = handStageLabel, fontSize = Dimens.TextSizeSmall, color = Color(0xFF6B7280))
+            }
             Spacer(modifier = Modifier.height(8.dp))
 
             Column(modifier = Modifier.weight(1f)) {
@@ -423,6 +461,10 @@ fun HomeScreen(
                             .weight(0.5f)
                             .padding(end = 8.dp)
                             .aspectRatio(handThumbAspectRatio)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = rememberRipple(bounded = true)
+                            ) { viewModel.retakeHandPalm() }
                     ) {
                         val palmFile = FileUtil.getRecordImageFile(context, uiState.handPalmPath)?.takeIf { it.exists() }
                         val palmModel = palmFile ?: handFrontShot
@@ -497,6 +539,10 @@ fun HomeScreen(
                             .weight(0.5f)
                             .padding(end = 8.dp)
                             .aspectRatio(handThumbAspectRatio)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = rememberRipple(bounded = true)
+                            ) { viewModel.retakeHandBack() }
                     ) {
                         val backFile = FileUtil.getRecordImageFile(context, uiState.handBackPath)?.takeIf { it.exists() }
                         val backModel = backFile ?: handBackShot
@@ -1040,6 +1086,26 @@ private fun ScannerFrameOverlay() {
 
 private fun formatTemp(temp: Float): String {
     return if (temp == 0f) "读取中..." else "%.1f°C".format(temp)
+}
+
+@Composable
+private fun StatusBadge(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = Color.Black.copy(alpha = 0.55f),
+        shape = RoundedCornerShape(18.dp),
+        tonalElevation = 0.dp,
+        modifier = modifier
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = Dimens.TextSizeSmall,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        )
+    }
 }
 
 @Composable

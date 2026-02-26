@@ -17,6 +17,10 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Singleton
 
@@ -77,14 +81,21 @@ object AppModule {
      */
     @Provides
     @Singleton
+    fun provideAppScope(): CoroutineScope {
+        return CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    }
+
+    @Provides
+    @Singleton
     fun provideFaceEngine(
         @ApplicationContext context: Context,
         seetaFaceEngine: SeetaFaceEngine,
         mockFaceEngine: MockFaceEngine,
+        appScope: CoroutineScope,
     ): FaceEngine {
         Timber.d("Initializing FaceEngine (Seeta)")
         return try {
-            seetaFaceEngine.init(context)
+            appScope.launch { seetaFaceEngine.initAsync(context) }
             seetaFaceEngine
         } catch (t: Throwable) {
             // Keep app usable even if native init crashes.

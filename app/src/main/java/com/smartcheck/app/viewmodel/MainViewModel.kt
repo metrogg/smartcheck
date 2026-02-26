@@ -124,6 +124,10 @@ class MainViewModel @Inject constructor(
                 lastFaceFrameAt = now
                 currentFaceBitmap = frame.copy(Bitmap.Config.ARGB_8888, false)
             }
+        } else {
+            if (faceDetectJob?.isActive == true) {
+                faceDetectJob?.cancel()
+            }
         }
         when (_uiState.value.state) {
             CheckState.IDLE -> processCameraFrame(frame)
@@ -221,6 +225,7 @@ class MainViewModel @Inject constructor(
      * 人脸识别成功回调
      */
     private fun onFaceRecognized(userId: Long, userName: String, confidence: Float) {
+        if (_uiState.value.state != CheckState.IDLE) return
         Timber.d("Face recognized: $userName (confidence: $confidence)")
 
         viewModelScope.launch {
@@ -510,6 +515,35 @@ class MainViewModel @Inject constructor(
                 _uiState.update { it.copy(isSubmitting = false) }
             }
         }
+    }
+
+    fun retakeFace() {
+        reset()
+    }
+
+    fun retakeHandPalm() {
+        val state = _uiState.value
+        if (state.currentUserId == null) return
+        if (state.isSubmitting) return
+        startHandPalmCheck()
+    }
+
+    fun retakeHandBack() {
+        val state = _uiState.value
+        if (state.currentUserId == null) return
+        if (state.isSubmitting) return
+        val palmIssues = state.handPalmInfos.filter { it.hasForeignObject }.map { it.label }
+        _uiState.update {
+            it.copy(
+                handBackPath = null,
+                handBackInfos = emptyList(),
+                handBackFrameWidth = null,
+                handBackFrameHeight = null,
+                handHasIssue = palmIssues.isNotEmpty(),
+                handDetectionResults = palmIssues
+            )
+        }
+        startHandBackCheck()
     }
 
     private fun startHandPalmCheck() {

@@ -7,7 +7,6 @@ import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraXConfig
 import com.smartcheck.sdk.HandDetector
-import com.smartcheck.sdk.face.FaceSdk
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import java.io.File
@@ -34,8 +33,6 @@ class App : Application(), CameraXConfig.Provider {
         // 初始化 HandDetector
         initHandDetector()
 
-        // 初始化 FaceSdk (仅一次)
-        initFaceSdk()
     }
 
     private fun installCrashHandler() {
@@ -87,18 +84,6 @@ class App : Application(), CameraXConfig.Provider {
         }
     }
 
-    private fun initFaceSdk() {
-        try {
-            val ret = FaceSdk.init(this)
-            if (ret == 0) {
-                Timber.i("FaceSdk initialized successfully")
-            } else {
-                Timber.e("FaceSdk initialization failed: $ret, ${FaceSdk.getLastInitError()}")
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to initialize FaceSdk")
-        }
-    }
 
     override fun getCameraXConfig(): CameraXConfig {
         val defaultConfig = Camera2Config.defaultConfig()
