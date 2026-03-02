@@ -14,15 +14,13 @@ import com.smartcheck.app.domain.model.toEntity
 import com.smartcheck.app.domain.model.HandStatus
 import com.smartcheck.app.domain.model.HealthCertStatus
 import com.smartcheck.app.domain.model.Record
-import com.smartcheck.app.domain.model.User
 import com.smartcheck.app.domain.repository.IRecordRepository
 import com.smartcheck.app.domain.repository.IUserRepository
 import com.smartcheck.app.domain.repository.IVoiceService
+import com.smartcheck.app.domain.usecase.HandCheckResult
+import com.smartcheck.app.domain.usecase.ImageStorageUseCase
 import com.smartcheck.app.domain.usecase.MorningCheckUseCase
-import com.smartcheck.app.domain.usecase.RecordManageUseCase
-import com.smartcheck.app.domain.usecase.UserManageUseCase
 import com.smartcheck.app.ml.FaceEngine
-import com.smartcheck.app.utils.FileUtil
 import com.smartcheck.sdk.HandDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,10 +55,8 @@ class MainViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val userRepository: IUserRepository,
     private val recordRepository: IRecordRepository,
-    // UseCase 依赖（用于解耦和测试）
-    val morningCheckUseCase: MorningCheckUseCase? = null,
-    val userManageUseCase: UserManageUseCase? = null,
-    val recordManageUseCase: RecordManageUseCase? = null
+    private val morningCheckUseCase: MorningCheckUseCase,
+    private val imageStorageUseCase: ImageStorageUseCase
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(UiState())
@@ -242,23 +238,16 @@ class MainViewModel @Inject constructor(
         Timber.d("Face recognized: $userName (confidence: $confidence)")
 
         viewModelScope.launch {
-            val userResult = userRepository.getUserById(userId)
-            val user = userResult.getOrNull()
-            val healthCertEndDate = user?.healthCertEndDate
-            val remainingDays = healthCertEndDate?.let { calcRemainingDays(it) }
-            if (remainingDays != null && remainingDays < 7) {
-                voiceService.speak("健康证即将到期")
-            }
-
+            val result = morningCheckUseCase.onFaceRecognized(userId, userName, confidence)
             _uiState.update {
                 it.copy(
                     state = CheckState.FACE_PASS,
-                    currentUserId = userId,
-                    currentUserName = userName,
-                    healthCertEndDate = healthCertEndDate,
-                    healthCertDaysRemaining = remainingDays,
-                    faceConfidence = confidence,
-                    message = "欢迎，$userName"
+                    currentUserId = result.userId,
+                    currentUserName = result.userName,
+                    healthCertEndDate = result.healthCertEndDate,
+                    healthCertDaysRemaining = result.healthCertDaysRemaining,
+                    faceConfidence = result.faceConfidence,
+                    message = result.message
                 )
             }
         }
@@ -267,23 +256,14 @@ class MainViewModel @Inject constructor(
         faceSaveJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val bitmap = currentFaceBitmap ?: return@launch
-                val safeBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                val filename = "face_${System.currentTimeMillis()}.jpg"
-                val available = appContext.filesDir.usableSpace
-                if (available < minFreeBytes) {
-                    safeBitmap.safeRecycle()
-                    _uiState.update { it.copy(message = "存储空间不足，无法保存照片") }
-                    return@launch
-                }
-                val result = FileUtil.saveBitmapToInternalResult(appContext, safeBitmap, filename)
+                val result = imageStorageUseCase.saveFaceImage(bitmap)
                 result.onSuccess { name ->
                     currentFacePath = name
                     _uiState.update { it.copy(faceImagePath = name) }
                 }.onFailure {
                     _uiState.update { it.copy(message = "照片保存失败") }
                 }
-                safeBitmap.safeRecycle()
-                currentFaceBitmap.safeRecycle()
+                bitmap.recycle()
                 currentFaceBitmap = null
             } catch (e: Exception) {
                 Timber.e(e, "Failed to save face snapshot")
@@ -291,9 +271,7 @@ class MainViewModel @Inject constructor(
         }
         
         hardwareRepository.beep("success")
-        voiceService.speak("欢迎，$userName")
         
-        // 1 秒后自动进入测温
         viewModelScope.launch {
             delay(1000)
             startTemperatureMeasure()
@@ -304,7 +282,7 @@ class MainViewModel @Inject constructor(
      * 开始测温
      */
     private fun startTemperatureMeasure() {
-        Timber.d("Starting temperature mea surement")
+        Timber.d("Starting temperature measurement")
         
         _uiState.update {
             it.copy(
@@ -317,22 +295,17 @@ class MainViewModel @Inject constructor(
         
         tempMeasureJob?.cancel()
         tempMeasureJob = viewModelScope.launch {
-            val startAt = SystemClock.elapsedRealtime()
-            hardwareRepository.getTemperatureFlow()
-                .take(3) // 取 3 次读数
-                .collect { temp ->
-                    Timber.d("Temperature reading: $temp")
-                    _uiState.update { it.copy(currentTemp = temp) }
+            val result = morningCheckUseCase.measureTemperatureFlow(3)
+            result.onSuccess { tempResult ->
+                _uiState.update { it.copy(currentTemp = tempResult.temperature) }
+                if (tempResult.isNormal) {
+                    onTemperatureNormal(tempResult.temperature)
+                } else {
+                    onTemperatureAbnormal(tempResult.temperature)
                 }
-            val elapsed = SystemClock.elapsedRealtime() - startAt
-            _perfMetrics.update { it.copy(tempDuration = elapsed.milliseconds) }
-            
-            // 测温完成，判断结果
-            val avgTemp = _uiState.value.currentTemp
-            if (avgTemp < 37.3f) {
-                onTemperatureNormal(avgTemp)
-            } else {
-                onTemperatureAbnormal(avgTemp)
+            }.onFailure {
+                _uiState.update { it.copy(message = "测温失败") }
+                scheduleReset(3000)
             }
         }
     }
@@ -350,7 +323,7 @@ class MainViewModel @Inject constructor(
             )
         }
         hardwareRepository.beep("success")
-        voiceService.speak("体温正常，请准备手部检测")
+        morningCheckUseCase.speakTemperatureNormal()
         startHandPalmCheck()
     }
     
@@ -368,12 +341,10 @@ class MainViewModel @Inject constructor(
         }
         
         hardwareRepository.beep("error")
-        voiceService.speak("体温异常，请复测")
+        morningCheckUseCase.speakTemperatureAbnormal(temp)
         
-        // 保存失败记录
         saveCheckRecord(isPassed = false, isTempNormal = false, isHandNormal = true)
         
-        // 5 秒后重置
         scheduleReset(5000)
     }
     
@@ -399,7 +370,7 @@ class MainViewModel @Inject constructor(
                 autoSubmitRemainingSec = null
             )
         }
-        voiceService.speak("请回答健康询问")
+        morningCheckUseCase.speakHandCheckPass()
     }
     
     /**
@@ -417,18 +388,18 @@ class MainViewModel @Inject constructor(
         }
         
         hardwareRepository.beep("error")
-        voiceService.speak("手部检测不合格")
+        morningCheckUseCase.speakHandCheckFail()
         _uiState.update { it.copy(symptomFlags = issues.joinToString(", ")) }
     }
 
     fun submitSymptoms(symptoms: List<String>) {
         if (_uiState.value.state != CheckState.SYMPTOM_CHECKING) return
 
-        val trimmed = symptoms.map { it.trim() }.filter { it.isNotEmpty() }
-        if (trimmed.isEmpty()) {
+        val result = morningCheckUseCase.processSymptomSubmission(symptoms)
+        if (result.isAllPass) {
             onAllPass(remark = "无")
         } else {
-            onSymptomFail(trimmed)
+            onSymptomFail(symptoms)
         }
     }
 
@@ -443,10 +414,8 @@ class MainViewModel @Inject constructor(
         }
 
         hardwareRepository.beep("success")
-        voiceService.speak("晨检成功，祝您工作愉快")
+        morningCheckUseCase.speakAllPass()
         hardwareRepository.openDoor()
-
-        // 记录由 finalizeCheckRecord() 统一提交
     }
 
     fun confirmHandFront(issues: List<String>) = Unit
@@ -464,9 +433,7 @@ class MainViewModel @Inject constructor(
         }
 
         hardwareRepository.beep("error")
-        voiceService.speak("请人工复核")
-
-        // 记录由 finalizeCheckRecord() 统一提交
+        morningCheckUseCase.speakSymptomFail()
     }
 
     fun finalizeCheckRecord() {
@@ -490,7 +457,6 @@ class MainViewModel @Inject constructor(
 
                 val userResult = userRepository.getUserById(state.currentUserId)
                 val user = userResult.getOrNull()
-                val remark = if (state.symptomFlags.isBlank()) "无" else state.symptomFlags
 
                 val healthCertStatus = when {
                     state.healthCertDaysRemaining == null -> HealthCertStatus.VALID
@@ -499,31 +465,36 @@ class MainViewModel @Inject constructor(
                     else -> HealthCertStatus.VALID
                 }
 
-                val record = Record(
+                val handCheckResult = HandCheckResult(
+                    palmNormal = isHandNormal,
+                    backNormal = isHandNormal,
+                    palmImagePath = currentPalmPath,
+                    backImagePath = currentBackPath
+                )
+
+                val result = morningCheckUseCase.saveRecord(
                     userId = state.currentUserId,
                     userName = state.currentUserName,
                     employeeId = user?.employeeId ?: "",
                     temperature = state.currentTemp,
                     isTempNormal = isTempNormal,
-                    isHandNormal = isHandNormal,
-                    isPassed = isPassed,
-                    handStatus = if (isHandNormal) HandStatus.NORMAL else HandStatus.ABNORMAL,
+                    handCheckResult = handCheckResult,
+                    symptoms = emptyList(),
                     healthCertStatus = healthCertStatus,
-                    symptomFlags = emptyList(),
                     faceImagePath = currentFacePath,
-                    handPalmPath = currentPalmPath,
-                    handBackPath = currentBackPath,
-                    remark = remark
+                    palmImagePath = currentPalmPath,
+                    backImagePath = currentBackPath
                 )
-                val saveResult = recordRepository.saveRecord(record)
-                val recordId = saveResult.getOrNull() ?: 0L
-                val savedRecord = record.copy(id = recordId)
-                Timber.d("Record saved: $savedRecord")
 
-                runCatching {
-                    recordUploadReporter.upload(savedRecord.toEntity())
+                result.onSuccess { savedRecord ->
+                    Timber.d("Record saved: $savedRecord")
+                    runCatching {
+                        recordUploadReporter.upload(savedRecord.toEntity())
+                    }.onFailure { e ->
+                        Timber.e(e, "Failed to upload record")
+                    }
                 }.onFailure { e ->
-                    Timber.e(e, "Failed to upload record")
+                    Timber.e(e, "Failed to save record")
                 }
 
                 _uiState.update { it.copy(isRecordFinalized = true) }
@@ -833,23 +804,15 @@ class MainViewModel @Inject constructor(
             palmSaveJob?.cancel()
             palmSaveJob = viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    val filename = "hand_palm_${System.currentTimeMillis()}.jpg"
-                    val safeBitmap = snapshot?.copy(Bitmap.Config.ARGB_8888, false) ?: return@launch
-                    val available = appContext.filesDir.usableSpace
-                    if (available < minFreeBytes) {
-                        safeBitmap.safeRecycle()
-                        _uiState.update { it.copy(message = "存储空间不足，无法保存照片") }
-                        return@launch
-                    }
-                    val result = FileUtil.saveBitmapToInternalResult(appContext, safeBitmap, filename)
+                    val bitmap = currentPalmBitmap ?: return@launch
+                    val result = imageStorageUseCase.savePalmImage(bitmap)
                     result.onSuccess { name ->
                         currentPalmPath = name
                         _uiState.update { it.copy(handPalmPath = name) }
                     }.onFailure {
                         _uiState.update { it.copy(message = "照片保存失败") }
                     }
-                    safeBitmap.safeRecycle()
-                    currentPalmBitmap.safeRecycle()
+                    bitmap.recycle()
                     currentPalmBitmap = null
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to save hand palm snapshot")
@@ -891,23 +854,15 @@ class MainViewModel @Inject constructor(
             backSaveJob?.cancel()
             backSaveJob = viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    val filename = "hand_back_${System.currentTimeMillis()}.jpg"
-                    val safeBitmap = snapshot?.copy(Bitmap.Config.ARGB_8888, false) ?: return@launch
-                    val available = appContext.filesDir.usableSpace
-                    if (available < minFreeBytes) {
-                        safeBitmap.safeRecycle()
-                        _uiState.update { it.copy(message = "存储空间不足，无法保存照片") }
-                        return@launch
-                    }
-                    val result = FileUtil.saveBitmapToInternalResult(appContext, safeBitmap, filename)
+                    val bitmap = currentBackBitmap ?: return@launch
+                    val result = imageStorageUseCase.saveBackImage(bitmap)
                     result.onSuccess { name ->
                         currentBackPath = name
                         _uiState.update { it.copy(handBackPath = name) }
                     }.onFailure {
                         _uiState.update { it.copy(message = "照片保存失败") }
                     }
-                    safeBitmap.safeRecycle()
-                    currentBackBitmap.safeRecycle()
+                    bitmap.recycle()
                     currentBackBitmap = null
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to save hand back snapshot")

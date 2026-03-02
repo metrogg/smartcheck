@@ -13,6 +13,7 @@ sealed class AppError : Throwable() {
     object ModelNotLoaded : AppError()
     data class DetectionError(val type: String, val errorMsg: String) : AppError()
     object NoTargetDetected : AppError()
+    data class StorageError(val errorMsg: String) : AppError()
 
     data class UnknownError(val errorMsg: String) : AppError()
 

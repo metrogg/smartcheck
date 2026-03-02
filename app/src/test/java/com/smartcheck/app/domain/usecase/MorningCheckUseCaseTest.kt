@@ -37,37 +37,49 @@ class MorningCheckUseCaseTest {
     }
 
     @Test
-    fun `recognizeFace returns user when found`() = runTest {
+    fun `onFaceRecognized returns result with user info when found`() = runTest {
         // Given
-        val embedding = ByteArray(512) { it.toByte() }
+        val userId = 1L
+        val userName = "张三"
+        val confidence = 0.95f
         val expectedUser = User(
-            id = 1L,
-            name = "张三",
-            employeeId = "EMP001"
+            id = userId,
+            name = userName,
+            employeeId = "EMP001",
+            healthCertEndDate = System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000
         )
-        coEvery { userRepository.getUserByFaceFeature(embedding) } returns Result.success(expectedUser)
+        coEvery { userRepository.getUserById(userId) } returns Result.success(expectedUser)
 
         // When
-        val result = useCase.recognizeFace(embedding)
+        val result = useCase.onFaceRecognized(userId, userName, confidence)
 
         // Then
-        assertTrue(result.isSuccess)
-        assertEquals(expectedUser, result.getOrNull())
+        assertEquals(userId, result.userId)
+        assertEquals(userName, result.userName)
+        assertEquals(confidence, result.faceConfidence)
+        coVerify { voiceService.speak("欢迎，$userName") }
     }
 
     @Test
-    fun `recognizeFace returns failure when not found`() = runTest {
+    fun `onFaceRecognized speaks health cert warning when expiring soon`() = runTest {
         // Given
-        val embedding = ByteArray(512) { it.toByte() }
-        coEvery { userRepository.getUserByFaceFeature(embedding) } returns Result.failure(
-            mockk(relaxed = true)
+        val userId = 1L
+        val userName = "张三"
+        val confidence = 0.95f
+        val expectedUser = User(
+            id = userId,
+            name = userName,
+            employeeId = "EMP001",
+            healthCertEndDate = System.currentTimeMillis() + 5L * 24 * 60 * 60 * 1000
         )
+        coEvery { userRepository.getUserById(userId) } returns Result.success(expectedUser)
 
         // When
-        val result = useCase.recognizeFace(embedding)
+        val result = useCase.onFaceRecognized(userId, userName, confidence)
 
         // Then
-        assertTrue(result.isFailure)
+        assertTrue(result.healthCertDaysRemaining!! < 7)
+        coVerify { voiceService.speak("健康证即将到期") }
     }
 
     @Test
@@ -97,5 +109,26 @@ class MorningCheckUseCaseTest {
 
         // Then
         coVerify { voiceService.speak(message) }
+    }
+
+    @Test
+    fun `speakSuccess calls voiceService with welcome message`() {
+        // Given
+        val userName = "张三"
+
+        // When
+        useCase.speakSuccess(userName)
+
+        // Then
+        coVerify { voiceService.speak("欢迎，$userName") }
+    }
+
+    @Test
+    fun `speakHealthCertWarning calls voiceService`() {
+        // When
+        useCase.speakHealthCertWarning()
+
+        // Then
+        coVerify { voiceService.speak("健康证即将到期") }
     }
 }

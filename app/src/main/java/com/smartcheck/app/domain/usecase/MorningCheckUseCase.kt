@@ -13,6 +13,7 @@ import com.smartcheck.app.domain.repository.IUserRepository
 import com.smartcheck.app.domain.repository.IVoiceService
 import com.smartcheck.sdk.HandInfo
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -22,12 +23,44 @@ class MorningCheckUseCase @Inject constructor(
     private val temperatureService: ITemperatureService,
     private val voiceService: IVoiceService
 ) {
-    suspend fun recognizeFace(embedding: ByteArray): Result<User> {
-        return userRepository.getUserByFaceFeature(embedding)
+    suspend fun getUserWithHealthCheck(userId: Long): Result<UserCheckResult> {
+        return userRepository.getUserById(userId).map { user ->
+            val healthStatus = user.getHealthCertStatus()
+            val daysRemaining = user.getHealthCertDaysRemaining()
+            UserCheckResult(
+                user = user,
+                healthCertStatus = healthStatus,
+                healthCertDaysRemaining = daysRemaining,
+                isHealthCertExpiringSoon = daysRemaining != null && daysRemaining < 7
+            )
+        }
     }
 
     suspend fun checkHealthCert(user: User): Result<HealthCertStatus> {
         return Result.success(user.getHealthCertStatus())
+    }
+
+    suspend fun measureTemperatureFlow(readings: Int = 3): Result<TemperatureMeasurementResult> {
+        return try {
+            var lastTemp = 0f
+            temperatureService.observeTemperature()
+                .take(readings)
+                .collect { temp ->
+                    lastTemp = temp
+                }
+            
+            val isNormal = lastTemp < TEMP_THRESHOLD
+            val message = if (isNormal) "体温正常" else "体温异常：${String.format("%.1f", lastTemp)}°C"
+            
+            Result.success(TemperatureMeasurementResult(
+                temperature = lastTemp,
+                isNormal = isNormal,
+                message = message
+            ))
+        } catch (e: Exception) {
+            Timber.e(e, "Temperature measurement failed")
+            Result.failure(AppError.HardwareError("temperature", e.message ?: "unknown"))
+        }
     }
 
     suspend fun measureTemperature(): Result<TemperatureResult> {
@@ -90,12 +123,77 @@ class MorningCheckUseCase @Inject constructor(
         }
     }
 
-    suspend fun submitSymptoms(userId: Long, symptoms: List<SymptomType>): Result<Unit> {
-        val hasFever = symptoms.contains(SymptomType.FEVER)
-        voiceService.speak(
-            if (hasFever) "有发烧症状，禁止上岗" else "症状已记录"
+    fun analyzeHandDetectionResults(infos: List<HandInfo>): HandDetectionAnalysis {
+        val hasForeignObject = infos.any { it.hasForeignObject }
+        val issues = if (hasForeignObject) {
+            infos.filter { it.hasForeignObject }.map { it.label }.ifEmpty { infos.map { it.label } }
+        } else {
+            emptyList()
+        }
+        return HandDetectionAnalysis(
+            hasIssue = hasForeignObject,
+            issues = issues,
+            isPassing = !hasForeignObject
         )
-        return Result.success(Unit)
+    }
+
+    fun processSymptomSubmission(symptoms: List<String>): SymptomSubmissionResult {
+        val trimmed = symptoms.map { it.trim() }.filter { it.isNotEmpty() }
+        
+        if (trimmed.isEmpty()) {
+            speak("无不适症状")
+            return SymptomSubmissionResult(
+                isAllPass = true,
+                hasFever = false,
+                message = "晨检通过！"
+            )
+        }
+        
+        val hasFever = trimmed.any { it.contains("发烧") || it.contains("发热") || it.contains("体温") }
+        
+        if (hasFever) {
+            speak("有发烧症状，禁止上岗")
+            return SymptomSubmissionResult(
+                isAllPass = false,
+                hasFever = true,
+                message = "有不适症状：${trimmed.joinToString(", ")}"
+            )
+        }
+        
+        speak("症状已记录")
+        return SymptomSubmissionResult(
+            isAllPass = false,
+            hasFever = false,
+            message = "有不适症状：${trimmed.joinToString(", ")}"
+        )
+    }
+
+    fun calculateHealthCertStatus(remainingDays: Int?): HealthCertStatus {
+        return when {
+            remainingDays == null -> HealthCertStatus.VALID
+            remainingDays < 0 -> HealthCertStatus.EXPIRED
+            remainingDays < 7 -> HealthCertStatus.EXPIRING_SOON
+            else -> HealthCertStatus.VALID
+        }
+    }
+
+    suspend fun submitSymptoms(symptoms: List<SymptomType>): SymptomSubmitResult {
+        val hasFever = symptoms.contains(SymptomType.FEVER)
+        val hasOtherSymptoms = symptoms.isNotEmpty()
+        
+        voiceService.speak(
+            when {
+                hasFever -> "有发烧症状，禁止上岗"
+                hasOtherSymptoms -> "症状已记录"
+                else -> "无不适症状"
+            }
+        )
+        
+        return SymptomSubmitResult(
+            hasFever = hasFever,
+            hasOtherSymptoms = hasOtherSymptoms,
+            shouldBlockWork = hasFever
+        )
     }
 
     suspend fun saveRecord(
@@ -106,8 +204,18 @@ class MorningCheckUseCase @Inject constructor(
         isTempNormal: Boolean,
         handCheckResult: HandCheckResult,
         symptoms: List<SymptomType>,
-        healthCertStatus: HealthCertStatus
+        healthCertStatus: HealthCertStatus,
+        faceImagePath: String? = null,
+        palmImagePath: String? = null,
+        backImagePath: String? = null
     ): Result<Record> {
+        val isPassed = calculateIsPassed(
+            isTempNormal = isTempNormal,
+            handCheckResult = handCheckResult,
+            healthCertStatus = healthCertStatus,
+            symptoms = symptoms
+        )
+
         val record = Record(
             userId = userId,
             userName = userName,
@@ -115,17 +223,14 @@ class MorningCheckUseCase @Inject constructor(
             temperature = temperature,
             isTempNormal = isTempNormal,
             isHandNormal = handCheckResult.palmNormal && handCheckResult.backNormal,
-            isPassed = isTempNormal &&
-                    handCheckResult.palmNormal &&
-                    handCheckResult.backNormal &&
-                    healthCertStatus != HealthCertStatus.EXPIRED &&
-                    !symptoms.contains(SymptomType.FEVER),
+            isPassed = isPassed,
             handStatus = if (handCheckResult.palmNormal && handCheckResult.backNormal)
                 HandStatus.NORMAL else HandStatus.ABNORMAL,
             healthCertStatus = healthCertStatus,
             symptomFlags = symptoms,
-            handPalmPath = handCheckResult.palmImagePath,
-            handBackPath = handCheckResult.backImagePath
+            faceImagePath = faceImagePath,
+            handPalmPath = palmImagePath,
+            handBackPath = backImagePath
         )
 
         return recordRepository.saveRecord(record).map { id ->
@@ -133,22 +238,114 @@ class MorningCheckUseCase @Inject constructor(
         }
     }
 
+    fun calculateIsPassed(
+        isTempNormal: Boolean,
+        handCheckResult: HandCheckResult,
+        healthCertStatus: HealthCertStatus,
+        symptoms: List<SymptomType>
+    ): Boolean {
+        return isTempNormal &&
+                handCheckResult.palmNormal &&
+                handCheckResult.backNormal &&
+                healthCertStatus != HealthCertStatus.EXPIRED &&
+                !symptoms.contains(SymptomType.FEVER)
+    }
+
     suspend fun checkTodayRecord(userId: Long): Result<Record?> {
         return recordRepository.getTodayRecordByUser(userId)
+    }
+
+    suspend fun onFaceRecognized(userId: Long, userName: String, confidence: Float): FaceRecognizedResult {
+        val userResult = userRepository.getUserById(userId)
+        val user = userResult.getOrNull()
+        val healthCertEndDate = user?.healthCertEndDate
+        val remainingDays = healthCertEndDate?.let { user.getHealthCertDaysRemaining() }?.toInt()
+
+        if (remainingDays != null && remainingDays < 7) {
+            speakHealthCertWarning()
+        }
+
+        speakSuccess(userName)
+
+        return FaceRecognizedResult(
+            userId = userId,
+            userName = userName,
+            healthCertEndDate = healthCertEndDate,
+            healthCertDaysRemaining = remainingDays,
+            faceConfidence = confidence,
+            message = "欢迎，$userName"
+        )
     }
 
     fun speak(text: String) {
         voiceService.speak(text)
     }
 
+    fun speakSuccess(userName: String) {
+        voiceService.speak("欢迎，$userName")
+    }
+
+    fun speakHealthCertWarning() {
+        voiceService.speak("健康证即将到期")
+    }
+
+    fun speakTemperatureNormal() {
+        voiceService.speak("体温正常，请准备手部检测")
+    }
+
+    fun speakTemperatureAbnormal(temp: Float) {
+        voiceService.speak("体温异常，请复测")
+    }
+
+    fun speakHandCheckPass() {
+        voiceService.speak("请回答健康询问")
+    }
+
+    fun speakHandCheckFail() {
+        voiceService.speak("手部检测不合格")
+    }
+
+    fun speakAllPass() {
+        voiceService.speak("晨检成功，祝您工作愉快")
+    }
+
+    fun speakSymptomFail() {
+        voiceService.speak("请人工复核")
+    }
+
     companion object {
-        const val TEMP_THRESHOLD = 37.5f
+        const val TEMP_THRESHOLD = 37.3f
     }
 }
+
+data class HandDetectionAnalysis(
+    val hasIssue: Boolean,
+    val issues: List<String>,
+    val isPassing: Boolean
+)
+
+data class SymptomSubmissionResult(
+    val isAllPass: Boolean,
+    val hasFever: Boolean,
+    val message: String
+)
+
+data class UserCheckResult(
+    val user: User,
+    val healthCertStatus: HealthCertStatus,
+    val healthCertDaysRemaining: Long?,
+    val isHealthCertExpiringSoon: Boolean
+)
 
 data class TemperatureResult(
     val temperature: Float,
     val isNormal: Boolean
+)
+
+data class TemperatureMeasurementResult(
+    val temperature: Float,
+    val isNormal: Boolean,
+    val message: String
 )
 
 data class HandCheckResult(
@@ -157,4 +354,19 @@ data class HandCheckResult(
     val palmImagePath: String?,
     val backImagePath: String?,
     val abnormalType: String? = null
+)
+
+data class SymptomSubmitResult(
+    val hasFever: Boolean,
+    val hasOtherSymptoms: Boolean,
+    val shouldBlockWork: Boolean
+)
+
+data class FaceRecognizedResult(
+    val userId: Long,
+    val userName: String,
+    val healthCertEndDate: Long?,
+    val healthCertDaysRemaining: Int?,
+    val faceConfidence: Float,
+    val message: String
 )
