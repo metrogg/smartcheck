@@ -30,12 +30,12 @@ class RecordManageUseCase @Inject constructor(
     }
 
     suspend fun deleteOldRecords(beforeTime: Long): Result<Unit> {
-        Timber.d("Deleting records before: $beforeTime")
+        Timber.tag("RecordManage").d("Deleting records before: $beforeTime")
         return recordRepository.deleteOldRecords(beforeTime)
     }
 
     suspend fun deleteAllRecords(): Result<Unit> {
-        Timber.w("Deleting all records")
+        Timber.tag("RecordManage").w("Deleting all records")
         return recordRepository.deleteAllRecords()
     }
 

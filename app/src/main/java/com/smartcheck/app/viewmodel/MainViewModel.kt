@@ -116,7 +116,7 @@ class MainViewModel @Inject constructor(
     }
     
     init {
-        Timber.d("MainViewModel initialized")
+        Timber.tag("MainViewModel").d("MainViewModel initialized")
         hardwareRepository.init()
         voiceService.setEnabled(settingsRepository.isVoiceEnabled())
         viewModelScope.launch {
@@ -167,7 +167,7 @@ class MainViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 // Normal control path (e.g. screen leaving).
             } catch (e: Exception) {
-                Timber.e(e, "Hand detection error")
+                Timber.tag("MainViewModel").e(e, "Hand detection error")
             } finally {
                 _isHandDetecting.value = false
             }
@@ -222,7 +222,7 @@ class MainViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 // Normal control flow
             } catch (e: Exception) {
-                Timber.e(e, "Face recognition error")
+                Timber.tag("MainViewModel").e(e, "Face recognition error")
             } finally {
                 safeBitmap.safeRecycle()
                 frame.safeRecycle()
@@ -235,7 +235,7 @@ class MainViewModel @Inject constructor(
      */
     private fun onFaceRecognized(userId: Long, userName: String, confidence: Float) {
         if (_uiState.value.state != CheckState.IDLE) return
-        Timber.d("Face recognized: $userName (confidence: $confidence)")
+        Timber.tag("MainViewModel").d("Face recognized: $userName (confidence: $confidence)")
 
         viewModelScope.launch {
             val result = morningCheckUseCase.onFaceRecognized(userId, userName, confidence)
@@ -266,7 +266,7 @@ class MainViewModel @Inject constructor(
                 bitmap.recycle()
                 currentFaceBitmap = null
             } catch (e: Exception) {
-                Timber.e(e, "Failed to save face snapshot")
+                Timber.tag("MainViewModel").e(e, "Failed to save face snapshot")
             }
         }
         
@@ -282,7 +282,7 @@ class MainViewModel @Inject constructor(
      * 开始测温
      */
     private fun startTemperatureMeasure() {
-        Timber.d("Starting temperature measurement")
+        Timber.tag("MainViewModel").d("Starting temperature measurement")
         
         _uiState.update {
             it.copy(
@@ -314,7 +314,7 @@ class MainViewModel @Inject constructor(
      * 体温正常
      */
     private fun onTemperatureNormal(temp: Float) {
-        Timber.d("Temperature normal: $temp")
+        Timber.tag("MainViewModel").d("Temperature normal: $temp")
 
         _uiState.update {
             it.copy(
@@ -331,7 +331,7 @@ class MainViewModel @Inject constructor(
      * 体温异常
      */
     private fun onTemperatureAbnormal(temp: Float) {
-        Timber.w("Temperature abnormal: $temp")
+        Timber.tag("MainViewModel").w("Temperature abnormal: $temp")
         
         _uiState.update {
             it.copy(
@@ -352,7 +352,7 @@ class MainViewModel @Inject constructor(
      * 执行手部检测
      */
     private fun performHandCheck() {
-        Timber.d("Performing hand check")
+        Timber.tag("MainViewModel").d("Performing hand check")
         startHandPalmCheck()
     }
     
@@ -360,7 +360,7 @@ class MainViewModel @Inject constructor(
      * 手检通过
      */
     private fun onHandCheckPass() {
-        Timber.d("Hand check passed")
+        Timber.tag("MainViewModel").d("Hand check passed")
 
         _handDetectionState.value = emptyList()
         _uiState.update {
@@ -377,7 +377,7 @@ class MainViewModel @Inject constructor(
      * 手检失败
      */
     private fun onHandCheckFail(issues: List<String>) {
-        Timber.w("Hand check failed: $issues")
+        Timber.tag("MainViewModel").w("Hand check failed: $issues")
         
         _uiState.update {
             it.copy(
@@ -487,20 +487,20 @@ class MainViewModel @Inject constructor(
                 )
 
                 result.onSuccess { savedRecord ->
-                    Timber.d("Record saved: $savedRecord")
+                    Timber.tag("MainViewModel").d("Record saved: $savedRecord")
                     runCatching {
                         recordUploadReporter.upload(savedRecord.toEntity())
                     }.onFailure { e ->
-                        Timber.e(e, "Failed to upload record")
+                        Timber.tag("MainViewModel").e(e, "Failed to upload record")
                     }
                 }.onFailure { e ->
-                    Timber.e(e, "Failed to save record")
+                    Timber.tag("MainViewModel").e(e, "Failed to save record")
                 }
 
                 _uiState.update { it.copy(isRecordFinalized = true) }
                 scheduleReset(if (isPassed) 3000 else 5000)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to finalize record")
+                Timber.tag("MainViewModel").e(e, "Failed to finalize record")
             } finally {
                 _uiState.update { it.copy(isSubmitting = false) }
             }
@@ -651,7 +651,7 @@ class MainViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Hand step check error")
+                Timber.tag("MainViewModel").e(e, "Hand step check error")
                 onHandCheckFail(listOf("检测异常"))
             } finally {
                 isHandStepProcessing.set(false)
@@ -708,17 +708,17 @@ class MainViewModel @Inject constructor(
                 val saveResult = recordRepository.saveRecord(record)
                 val recordId = saveResult.getOrNull() ?: 0L
                 val savedRecord = record.copy(id = recordId)
-                Timber.d("Record saved: $savedRecord")
+                Timber.tag("MainViewModel").d("Record saved: $savedRecord")
 
                 try {
                     withContext(Dispatchers.IO) {
                         recordUploadReporter.upload(savedRecord.toEntity())
                     }
                 } catch (e: Exception) {
-                    Timber.e(e, "Failed to upload record")
+                    Timber.tag("MainViewModel").e(e, "Failed to upload record")
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Failed to save record")
+                Timber.tag("MainViewModel").e(e, "Failed to save record")
             } finally {
                 _uiState.update { it.copy(isSubmitting = false) }
             }
@@ -740,7 +740,7 @@ class MainViewModel @Inject constructor(
      * 重置状态机到 IDLE
      */
     fun reset() {
-        Timber.d("Resetting state machine")
+        Timber.tag("MainViewModel").d("Resetting state machine")
 
         tempMeasureJob?.cancel()
         resetJob?.cancel()
@@ -815,7 +815,7 @@ class MainViewModel @Inject constructor(
                     bitmap.recycle()
                     currentPalmBitmap = null
                 } catch (e: Exception) {
-                    Timber.e(e, "Failed to save hand palm snapshot")
+                    Timber.tag("MainViewModel").e(e, "Failed to save hand palm snapshot")
                 }
             }
         }
@@ -865,7 +865,7 @@ class MainViewModel @Inject constructor(
                     bitmap.recycle()
                     currentBackBitmap = null
                 } catch (e: Exception) {
-                    Timber.e(e, "Failed to save hand back snapshot")
+                    Timber.tag("MainViewModel").e(e, "Failed to save hand back snapshot")
                 }
             }
         }
@@ -917,7 +917,7 @@ class MainViewModel @Inject constructor(
         handCooldownJob?.cancel()
         autoSubmitJob?.cancel()
         voiceService.shutdown()
-        Timber.d("MainViewModel cleared")
+        Timber.tag("MainViewModel").d("MainViewModel cleared")
     }
 
     private fun Bitmap?.safeRecycle() {
@@ -926,7 +926,7 @@ class MainViewModel @Inject constructor(
                 recycle()
             }
         } catch (e: Exception) {
-            Timber.w(e, "Bitmap recycle failed")
+            Timber.tag("MainViewModel").w(e, "Bitmap recycle failed")
         }
     }
 }

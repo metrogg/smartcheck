@@ -39,7 +39,7 @@ class UserManageUseCase @Inject constructor(
             return Result.failure(AppError.DuplicateError("employeeId", user.employeeId))
         }
 
-        Timber.d("Creating user: ${user.name}, employeeId: ${user.employeeId}")
+        Timber.tag("UserManage").d("Creating user: ${user.name}, employeeId: ${user.employeeId}")
         return userRepository.createUser(user)
     }
 
@@ -48,12 +48,12 @@ class UserManageUseCase @Inject constructor(
             return Result.failure(AppError.ValidationError("name", "姓名不能为空"))
         }
 
-        Timber.d("Updating user: ${user.id}, name: ${user.name}")
+        Timber.tag("UserManage").d("Updating user: ${user.id}, name: ${user.name}")
         return userRepository.updateUser(user)
     }
 
     suspend fun deleteUser(userId: Long): Result<Unit> {
-        Timber.d("Deleting user: $userId")
+        Timber.tag("UserManage").d("Deleting user: $userId")
         return userRepository.deleteUser(userId)
     }
 

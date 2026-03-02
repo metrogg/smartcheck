@@ -28,7 +28,7 @@ class ImageStorageUseCase @Inject constructor(
     private fun saveImage(bitmap: Bitmap, filename: String): Result<String> {
         val available = appContext.filesDir.usableSpace
         if (available < minFreeBytes) {
-            Timber.w("Insufficient storage space: $available bytes")
+            Timber.tag("ImageStorage").w("Insufficient storage space: $available bytes")
             return Result.failure(AppError.StorageError("存储空间不足"))
         }
 

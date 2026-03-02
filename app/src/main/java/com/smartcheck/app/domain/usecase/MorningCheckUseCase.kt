@@ -58,7 +58,7 @@ class MorningCheckUseCase @Inject constructor(
                 message = message
             ))
         } catch (e: Exception) {
-            Timber.e(e, "Temperature measurement failed")
+            Timber.tag("MorningCheck").e(e, "Temperature measurement failed")
             Result.failure(AppError.HardwareError("temperature", e.message ?: "unknown"))
         }
     }
@@ -70,7 +70,7 @@ class MorningCheckUseCase @Inject constructor(
             voiceService.speak(if (isNormal) "体温正常" else "体温异常")
             Result.success(TemperatureResult(temperature, isNormal))
         } catch (e: Exception) {
-            Timber.e(e, "Temperature measurement failed")
+            Timber.tag("MorningCheck").e(e, "Temperature measurement failed")
             Result.failure(AppError.HardwareError("temperature", e.message ?: "unknown"))
         }
     }
@@ -80,7 +80,7 @@ class MorningCheckUseCase @Inject constructor(
             temperatureService.initialize()
             Result.success(Unit)
         } catch (e: Exception) {
-            Timber.e(e, "Temperature service init failed")
+            Timber.tag("MorningCheck").e(e, "Temperature service init failed")
             Result.failure(AppError.HardwareNotReady)
         }
     }
@@ -118,7 +118,7 @@ class MorningCheckUseCase @Inject constructor(
                 abnormalType = abnormalType
             ))
         } catch (e: Exception) {
-            Timber.e(e, "Hand detection failed")
+            Timber.tag("MorningCheck").e(e, "Hand detection failed")
             Result.failure(AppError.DetectionError("hand", e.message ?: "unknown"))
         }
     }
