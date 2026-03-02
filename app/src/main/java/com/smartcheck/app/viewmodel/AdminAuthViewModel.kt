@@ -1,24 +1,60 @@
 package com.smartcheck.app.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.smartcheck.app.data.repository.AdminAuthRepository
+import androidx.lifecycle.viewModelScope
+import com.smartcheck.app.domain.repository.IAdminAuthService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class AdminAuthViewModel @Inject constructor(
-    private val adminAuthRepository: AdminAuthRepository
+    private val adminAuthService: IAdminAuthService
 ) : ViewModel() {
 
-    val isLoggedIn: StateFlow<Boolean> = adminAuthRepository.isLoggedIn
-    val account: StateFlow<String> = adminAuthRepository.account
+    private val _isLoggedIn = MutableStateFlow(false)
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
-    fun login(account: String, password: String): Boolean = adminAuthRepository.login(account, password)
+    private val _account = MutableStateFlow("admin")
+    val account: StateFlow<String> = _account.asStateFlow()
 
-    fun logout() = adminAuthRepository.logout()
+    init {
+        viewModelScope.launch {
+            adminAuthService.observeLoginState().collect { _isLoggedIn.value = it }
+        }
+        viewModelScope.launch {
+            adminAuthService.observeAccount().collect { _account.value = it }
+        }
+    }
 
-    fun setPassword(newPassword: String) = adminAuthRepository.setPassword(newPassword)
+    fun login(account: String, password: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val result = adminAuthService.login(account, password)
+            result.fold(
+                onSuccess = { onResult(true) },
+                onFailure = { onResult(false) }
+            )
+        }
+    }
 
-    fun setAccount(newAccount: String) = adminAuthRepository.setAccount(newAccount)
+    fun logout() {
+        viewModelScope.launch {
+            adminAuthService.logout()
+        }
+    }
+
+    fun setPassword(newPassword: String) {
+        viewModelScope.launch {
+            adminAuthService.changePassword("123456", newPassword)
+        }
+    }
+
+    fun setAccount(newAccount: String) {
+        viewModelScope.launch {
+            adminAuthService.changeAccount(newAccount, "123456")
+        }
+    }
 }

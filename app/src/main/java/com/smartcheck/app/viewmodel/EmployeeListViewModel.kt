@@ -2,12 +2,12 @@ package com.smartcheck.app.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.smartcheck.app.data.repository.UserRepository
+import com.smartcheck.app.domain.model.User
+import com.smartcheck.app.domain.repository.IUserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -16,7 +16,7 @@ import java.time.ZoneId
 
 @HiltViewModel
 class EmployeeListViewModel @Inject constructor(
-    userRepository: UserRepository
+    userRepository: IUserRepository
 ) : ViewModel() {
 
     data class EmployeeListItem(
@@ -39,11 +39,11 @@ class EmployeeListViewModel @Inject constructor(
     )
 
     val uiState: StateFlow<UiState> = combine(
-        userRepository.getAllActiveUsers(),
+        userRepository.observeAllUsers(),
         query,
         page
-    ) { list, q, p ->
-        val filtered = list.filter { user ->
+    ) { users: List<User>, q, p ->
+        val filtered = users.filter { user ->
             val key = q.trim().lowercase()
             if (key.isEmpty()) {
                 true

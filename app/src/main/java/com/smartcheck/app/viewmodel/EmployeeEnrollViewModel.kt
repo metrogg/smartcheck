@@ -2,22 +2,45 @@ package com.smartcheck.app.viewmodel
 
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
-import com.smartcheck.app.data.db.UserEntity
-import com.smartcheck.app.data.repository.UserRepository
+import androidx.lifecycle.viewModelScope
+import com.smartcheck.app.domain.model.User
+import com.smartcheck.app.domain.repository.IUserRepository
 import com.smartcheck.app.ml.FaceEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class EmployeeEnrollViewModel @Inject constructor(
-    private val userRepository: UserRepository,
+    private val userRepository: IUserRepository,
     private val faceEngine: FaceEngine
 ) : ViewModel() {
 
-    val users: Flow<List<UserEntity>> = userRepository.getAllActiveUsers()
+    val users: Flow<List<User>> = userRepository.observeAllUsers()
 
-    suspend fun enrollWithFrame(
+    fun enrollWithFrame(
+        name: String,
+        employeeId: String,
+        department: String,
+        idCardNumber: String,
+        healthCertImagePath: String,
+        healthCertStartDate: Long?,
+        healthCertEndDate: Long?,
+        frame: Bitmap,
+        onResult: (Long?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = enrollWithFrameSuspend(
+                name, employeeId, department, idCardNumber,
+                healthCertImagePath, healthCertStartDate, healthCertEndDate, frame
+            )
+            onResult(result)
+        }
+    }
+
+    private suspend fun enrollWithFrameSuspend(
         name: String,
         employeeId: String,
         department: String,
@@ -38,11 +61,23 @@ class EmployeeEnrollViewModel @Inject constructor(
             return null
         }
 
-        val existing = userRepository.getUserByEmployeeId(trimmedEmployeeId)
+        val existingResult = userRepository.getUserByEmployeeId(trimmedEmployeeId)
 
-        val userId = if (existing == null) {
-            userRepository.insertUser(
-                UserEntity(
+        val userId = existingResult.fold(
+            onSuccess = { existing ->
+                val updated = existing.copy(
+                    name = trimmedName,
+                    department = trimmedDepartment,
+                    idCardNumber = trimmedIdCard,
+                    healthCertImagePath = trimmedCertPath,
+                    healthCertStartDate = healthCertStartDate,
+                    healthCertEndDate = healthCertEndDate
+                )
+                userRepository.updateUser(updated)
+                existing.id
+            },
+            onFailure = {
+                val newUser = User(
                     name = trimmedName,
                     employeeId = trimmedEmployeeId,
                     idCardNumber = trimmedIdCard,
@@ -51,19 +86,11 @@ class EmployeeEnrollViewModel @Inject constructor(
                     healthCertEndDate = healthCertEndDate,
                     department = trimmedDepartment
                 )
-            )
-        } else {
-            val updated = existing.copy(
-                name = trimmedName,
-                department = trimmedDepartment,
-                idCardNumber = trimmedIdCard,
-                healthCertImagePath = trimmedCertPath,
-                healthCertStartDate = healthCertStartDate,
-                healthCertEndDate = healthCertEndDate
-            )
-            userRepository.updateUser(updated)
-            existing.id
-        }
+                userRepository.createUser(newUser).getOrNull()
+            }
+        )
+
+        if (userId == null) return null
 
         val ok = faceEngine.registerUser(userId, listOf(frame))
         if (!ok) return null

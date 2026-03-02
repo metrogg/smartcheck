@@ -6,12 +6,23 @@ import androidx.room.Room
 import com.smartcheck.app.data.db.AppDatabase
 import com.smartcheck.app.data.db.RecordDao
 import com.smartcheck.app.data.db.UserDao
+import com.smartcheck.app.data.repository.AdminAuthRepository
+import com.smartcheck.app.data.repository.RecordRepository
+import com.smartcheck.app.data.repository.TemperatureServiceImpl
+import com.smartcheck.app.data.repository.UserRepository
 import com.smartcheck.app.data.upload.NoOpRecordUploadReporter
 import com.smartcheck.app.data.upload.RecordUploadReporter
+import com.smartcheck.app.domain.repository.IAdminAuthService
+import com.smartcheck.app.domain.repository.IRecordRepository
+import com.smartcheck.app.domain.repository.ITemperatureService
+import com.smartcheck.app.domain.repository.IUserRepository
+import com.smartcheck.app.domain.repository.IVoiceService
 import com.smartcheck.app.ml.FaceEngine
 import com.smartcheck.app.ml.MockFaceEngine
 import com.smartcheck.app.ml.SeetaFaceEngine
+import com.smartcheck.app.voice.VoicePrompter
 import com.smartcheck.sdk.HandDetector
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -27,6 +38,31 @@ import javax.inject.Singleton
 /**
  * Hilt 依赖注入模块
  */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class AppModuleBinds {
+
+    @Binds
+    @Singleton
+    abstract fun bindUserRepository(repo: UserRepository): IUserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecordRepository(repo: RecordRepository): IRecordRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminAuthService(repo: AdminAuthRepository): IAdminAuthService
+
+    @Binds
+    @Singleton
+    abstract fun bindVoiceService(service: VoicePrompter): IVoiceService
+
+    @Binds
+    @Singleton
+    abstract fun bindTemperatureService(service: TemperatureServiceImpl): ITemperatureService
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
@@ -76,8 +112,7 @@ object AppModule {
     }
     
     /**
-     * 提供人脸识别引擎
-     * 当前使用 MockFaceEngine，将来替换为 SeetaFaceEngine
+     * 提供应用协程作用域
      */
     @Provides
     @Singleton

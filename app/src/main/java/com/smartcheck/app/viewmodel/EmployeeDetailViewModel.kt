@@ -5,8 +5,8 @@ import android.graphics.Bitmap
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.smartcheck.app.data.db.UserEntity
-import com.smartcheck.app.data.repository.UserRepository
+import com.smartcheck.app.domain.model.User
+import com.smartcheck.app.domain.repository.IUserRepository
 import com.smartcheck.app.utils.FileUtil
 import com.smartcheck.sdk.face.FaceSdk
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,14 +26,14 @@ import javax.inject.Inject
 @HiltViewModel
 class EmployeeDetailViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
-    private val userRepository: UserRepository,
+    private val userRepository: IUserRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val userId = savedStateHandle.get<String>("id")?.toLongOrNull()
 
-    private val _user = MutableStateFlow<UserEntity?>(null)
-    val user: StateFlow<UserEntity?> = _user.asStateFlow()
+    private val _user = MutableStateFlow<User?>(null)
+    val user: StateFlow<User?> = _user.asStateFlow()
 
     private val _events = MutableSharedFlow<UiEvent>(extraBufferCapacity = 1)
     val events = _events.asSharedFlow()
@@ -47,7 +47,10 @@ class EmployeeDetailViewModel @Inject constructor(
     init {
         if (userId != null) {
             viewModelScope.launch {
-                _user.value = userRepository.getUserById(userId)
+                userRepository.getUserById(userId).fold(
+                    onSuccess = { _user.value = it },
+                    onFailure = { _user.value = null }
+                )
             }
         }
     }
@@ -87,7 +90,7 @@ class EmployeeDetailViewModel @Inject constructor(
     fun deleteUser() {
         val current = _user.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            userRepository.deleteUser(current)
+            userRepository.deleteUser(current.id)
             _events.tryEmit(UiEvent.Saved)
         }
     }
@@ -165,26 +168,39 @@ class EmployeeDetailViewModel @Inject constructor(
                     val certImageName = FileUtil.saveBitmapToInternal(appContext, certBitmap, certName)
 
                     val current = _user.value
-                    val entity = (current ?: UserEntity(
-                        name = trimmedName,
-                        employeeId = trimmedId
-                    )).copy(
-                        name = trimmedName,
-                        employeeId = trimmedId,
-                        idCardNumber = idCardNumber.trim(),
-                        healthCertStartDate = healthCertStartDate,
-                        healthCertEndDate = healthCertEndDate,
-                        faceEmbedding = embedding,
-                        faceImagePath = faceImageName,
-                        healthCertImagePath = certImageName
-                    )
+                    val newUser = if (current != null) {
+                        current.copy(
+                            name = trimmedName,
+                            employeeId = trimmedId,
+                            idCardNumber = idCardNumber.trim(),
+                            healthCertStartDate = healthCertStartDate,
+                            healthCertEndDate = healthCertEndDate,
+                            faceEmbedding = embedding,
+                            faceImagePath = faceImageName,
+                            healthCertImagePath = certImageName
+                        )
+                    } else {
+                        User(
+                            name = trimmedName,
+                            employeeId = trimmedId,
+                            idCardNumber = idCardNumber.trim(),
+                            healthCertStartDate = healthCertStartDate,
+                            healthCertEndDate = healthCertEndDate,
+                            faceEmbedding = embedding,
+                            faceImagePath = faceImageName,
+                            healthCertImagePath = certImageName
+                        )
+                    }
 
                     if (current == null) {
-                        val newId = userRepository.insertUser(entity)
-                        _user.value = entity.copy(id = newId)
+                        val result = userRepository.createUser(newUser)
+                        result.fold(
+                            onSuccess = { newId -> _user.value = newUser.copy(id = newId) },
+                            onFailure = { emitError("创建用户失败") }
+                        )
                     } else {
-                        userRepository.updateUser(entity)
-                        _user.value = entity
+                        userRepository.updateUser(newUser)
+                        _user.value = newUser
                     }
                     launch(Dispatchers.Main) {
                         onSuccess()

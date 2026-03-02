@@ -47,9 +47,9 @@ fun RecordDetailScreen(
     LaunchedEffect(record) {
         val value = record ?: return@LaunchedEffect
         temperature = value.temperature.toString()
-        handStatus = value.handStatus
-        healthCertStatus = value.healthCertStatus
-        symptomFlags = value.symptomFlags
+        handStatus = value.handStatus.name
+        healthCertStatus = value.healthCertStatus.name
+        symptomFlags = value.symptomFlags.joinToString(",") { it.name }
         remark = value.remark
     }
 

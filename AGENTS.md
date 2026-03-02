@@ -72,11 +72,18 @@ Instrumented tests (device/emulator):
 - Single method:
   `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.smartcheck.app.SomeInstrumentedTest#someMethod`
 
+Debugging:
+- To debug a release build, add `android:debuggable="true"` in AndroidManifest.xml (temporary).
+- For native debugging, attach GDB/LLDB to the ndk-gdb/py-debugger process.
+- View Timber logs: `adb logcat -s Timber:*`
+
 Troubleshooting:
 - If native build fails, confirm NDK is installed and Gradle sees CMake 3.22.1.
 - If you see CRLF/LF warnings on Windows, avoid reformatting unrelated files; keep diffs minimal.
 - `fr_2_10.dat` is tracked via Git LFS (`face-sdk/src/main/assets/fr_2_10.dat`). If the model is a tiny text pointer file, run `git lfs pull`.
 - If you hit duplicate `libc++_shared.so` packaging errors, keep `pickFirsts` in module `packaging { jniLibs { ... } }`.
+- If you encounter "Unable to find CMake" errors, ensure CMake 3.22.1 is installed via Android Studio SDK Manager or manually added to PATH.
+- Clean and rebuild if you see stale native artifacts: `./gradlew clean && ./gradlew assembleDebug`
 
 Notes:
 - No ktlint/detekt/spotless configured; use Android Studio formatting.

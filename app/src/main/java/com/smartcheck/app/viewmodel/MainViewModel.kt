@@ -7,15 +7,22 @@ import android.content.Context
 import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.smartcheck.app.data.db.RecordEntity
 import com.smartcheck.app.data.repository.HardwareRepository
-import com.smartcheck.app.data.repository.RecordRepository
 import com.smartcheck.app.data.repository.SettingsRepository
-import com.smartcheck.app.data.repository.UserRepository
 import com.smartcheck.app.data.upload.RecordUploadReporter
+import com.smartcheck.app.domain.model.toEntity
+import com.smartcheck.app.domain.model.HandStatus
+import com.smartcheck.app.domain.model.HealthCertStatus
+import com.smartcheck.app.domain.model.Record
+import com.smartcheck.app.domain.model.User
+import com.smartcheck.app.domain.repository.IRecordRepository
+import com.smartcheck.app.domain.repository.IUserRepository
+import com.smartcheck.app.domain.repository.IVoiceService
+import com.smartcheck.app.domain.usecase.MorningCheckUseCase
+import com.smartcheck.app.domain.usecase.RecordManageUseCase
+import com.smartcheck.app.domain.usecase.UserManageUseCase
 import com.smartcheck.app.ml.FaceEngine
 import com.smartcheck.app.utils.FileUtil
-import com.smartcheck.app.voice.VoicePrompter
 import com.smartcheck.sdk.HandDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -37,17 +44,23 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 主 ViewModel - 晨检状态机核心逻辑
+ * 
+ * 注意：此 ViewModel 仍包含大量业务逻辑，待逐步迁移到 UseCase 层
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val faceEngine: FaceEngine,
     private val hardwareRepository: HardwareRepository,
-    private val voicePrompter: VoicePrompter,
+    private val voiceService: IVoiceService,
     private val recordUploadReporter: RecordUploadReporter,
     private val settingsRepository: SettingsRepository,
-    private val userRepository: UserRepository,
-    private val recordRepository: RecordRepository
+    private val userRepository: IUserRepository,
+    private val recordRepository: IRecordRepository,
+    // UseCase 依赖（用于解耦和测试）
+    val morningCheckUseCase: MorningCheckUseCase? = null,
+    val userManageUseCase: UserManageUseCase? = null,
+    val recordManageUseCase: RecordManageUseCase? = null
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(UiState())
@@ -109,10 +122,10 @@ class MainViewModel @Inject constructor(
     init {
         Timber.d("MainViewModel initialized")
         hardwareRepository.init()
-        voicePrompter.setEnabled(settingsRepository.isVoiceEnabled())
+        voiceService.setEnabled(settingsRepository.isVoiceEnabled())
         viewModelScope.launch {
             settingsRepository.voiceEnabled.collect { enabled ->
-                voicePrompter.setEnabled(enabled)
+                voiceService.setEnabled(enabled)
             }
         }
     }
@@ -229,11 +242,12 @@ class MainViewModel @Inject constructor(
         Timber.d("Face recognized: $userName (confidence: $confidence)")
 
         viewModelScope.launch {
-            val user = runCatching { userRepository.getUserById(userId) }.getOrNull()
+            val userResult = userRepository.getUserById(userId)
+            val user = userResult.getOrNull()
             val healthCertEndDate = user?.healthCertEndDate
             val remainingDays = healthCertEndDate?.let { calcRemainingDays(it) }
             if (remainingDays != null && remainingDays < 7) {
-                voicePrompter.speak("健康证即将到期")
+                voiceService.speak("健康证即将到期")
             }
 
             _uiState.update {
@@ -277,7 +291,7 @@ class MainViewModel @Inject constructor(
         }
         
         hardwareRepository.beep("success")
-        voicePrompter.speak("欢迎，$userName")
+        voiceService.speak("欢迎，$userName")
         
         // 1 秒后自动进入测温
         viewModelScope.launch {
@@ -299,7 +313,7 @@ class MainViewModel @Inject constructor(
             )
         }
         
-        voicePrompter.speak("正在测温")
+        voiceService.speak("正在测温")
         
         tempMeasureJob?.cancel()
         tempMeasureJob = viewModelScope.launch {
@@ -336,7 +350,7 @@ class MainViewModel @Inject constructor(
             )
         }
         hardwareRepository.beep("success")
-        voicePrompter.speak("体温正常，请准备手部检测")
+        voiceService.speak("体温正常，请准备手部检测")
         startHandPalmCheck()
     }
     
@@ -354,7 +368,7 @@ class MainViewModel @Inject constructor(
         }
         
         hardwareRepository.beep("error")
-        voicePrompter.speak("体温异常，请复测")
+        voiceService.speak("体温异常，请复测")
         
         // 保存失败记录
         saveCheckRecord(isPassed = false, isTempNormal = false, isHandNormal = true)
@@ -385,7 +399,7 @@ class MainViewModel @Inject constructor(
                 autoSubmitRemainingSec = null
             )
         }
-        voicePrompter.speak("请回答健康询问")
+        voiceService.speak("请回答健康询问")
     }
     
     /**
@@ -403,7 +417,7 @@ class MainViewModel @Inject constructor(
         }
         
         hardwareRepository.beep("error")
-        voicePrompter.speak("手部检测不合格")
+        voiceService.speak("手部检测不合格")
         _uiState.update { it.copy(symptomFlags = issues.joinToString(", ")) }
     }
 
@@ -429,7 +443,7 @@ class MainViewModel @Inject constructor(
         }
 
         hardwareRepository.beep("success")
-        voicePrompter.speak("晨检成功，祝您工作愉快")
+        voiceService.speak("晨检成功，祝您工作愉快")
         hardwareRepository.openDoor()
 
         // 记录由 finalizeCheckRecord() 统一提交
@@ -450,7 +464,7 @@ class MainViewModel @Inject constructor(
         }
 
         hardwareRepository.beep("error")
-        voicePrompter.speak("请人工复核")
+        voiceService.speak("请人工复核")
 
         // 记录由 finalizeCheckRecord() 统一提交
     }
@@ -474,9 +488,18 @@ class MainViewModel @Inject constructor(
                 palmSaveJob?.join()
                 backSaveJob?.join()
 
-                val user = userRepository.getUserById(state.currentUserId)
+                val userResult = userRepository.getUserById(state.currentUserId)
+                val user = userResult.getOrNull()
                 val remark = if (state.symptomFlags.isBlank()) "无" else state.symptomFlags
-                val record = RecordEntity(
+
+                val healthCertStatus = when {
+                    state.healthCertDaysRemaining == null -> HealthCertStatus.VALID
+                    state.healthCertDaysRemaining < 0 -> HealthCertStatus.EXPIRED
+                    state.healthCertDaysRemaining < 7 -> HealthCertStatus.EXPIRING_SOON
+                    else -> HealthCertStatus.VALID
+                }
+
+                val record = Record(
                     userId = state.currentUserId,
                     userName = state.currentUserName,
                     employeeId = user?.employeeId ?: "",
@@ -484,25 +507,21 @@ class MainViewModel @Inject constructor(
                     isTempNormal = isTempNormal,
                     isHandNormal = isHandNormal,
                     isPassed = isPassed,
-                    handStatus = if (isHandNormal) "正常" else "异常",
-                    healthCertStatus = when {
-                        state.healthCertDaysRemaining == null -> "未知"
-                        state.healthCertDaysRemaining < 0 -> "过期"
-                        state.healthCertDaysRemaining < 7 -> "即将过期"
-                        else -> "有效"
-                    },
-                    symptomFlags = remark,
+                    handStatus = if (isHandNormal) HandStatus.NORMAL else HandStatus.ABNORMAL,
+                    healthCertStatus = healthCertStatus,
+                    symptomFlags = emptyList(),
                     faceImagePath = currentFacePath,
                     handPalmPath = currentPalmPath,
                     handBackPath = currentBackPath,
                     remark = remark
                 )
-                val recordId = recordRepository.insertRecord(record)
+                val saveResult = recordRepository.saveRecord(record)
+                val recordId = saveResult.getOrNull() ?: 0L
                 val savedRecord = record.copy(id = recordId)
                 Timber.d("Record saved: $savedRecord")
 
                 runCatching {
-                    recordUploadReporter.upload(savedRecord)
+                    recordUploadReporter.upload(savedRecord.toEntity())
                 }.onFailure { e ->
                     Timber.e(e, "Failed to upload record")
                 }
@@ -566,7 +585,7 @@ class MainViewModel @Inject constructor(
             )
         }
 
-        voicePrompter.speak("请将手心对准摄像头")
+        voiceService.speak("请将手心对准摄像头")
     }
 
     private fun startHandBackCheck() {
@@ -582,7 +601,7 @@ class MainViewModel @Inject constructor(
             )
         }
 
-        voicePrompter.speak("请翻转手背对准摄像头")
+        voiceService.speak("请翻转手背对准摄像头")
     }
 
     private fun processHandStepFrame(frame: Bitmap) {
@@ -689,8 +708,17 @@ class MainViewModel @Inject constructor(
                 faceSaveJob?.join()
                 palmSaveJob?.join()
                 backSaveJob?.join()
-                val user = userRepository.getUserById(state.currentUserId)
-                val record = RecordEntity(
+                val userResult = userRepository.getUserById(state.currentUserId)
+                val user = userResult.getOrNull()
+
+                val healthCertStatus = when {
+                    state.healthCertDaysRemaining == null -> HealthCertStatus.VALID
+                    state.healthCertDaysRemaining < 0 -> HealthCertStatus.EXPIRED
+                    state.healthCertDaysRemaining < 7 -> HealthCertStatus.EXPIRING_SOON
+                    else -> HealthCertStatus.VALID
+                }
+
+                val record = Record(
                     userId = state.currentUserId,
                     userName = state.currentUserName,
                     employeeId = user?.employeeId ?: "",
@@ -698,26 +726,22 @@ class MainViewModel @Inject constructor(
                     isTempNormal = isTempNormal,
                     isHandNormal = isHandNormal,
                     isPassed = isPassed,
-                    handStatus = if (isHandNormal) "正常" else "异常",
-                    healthCertStatus = when {
-                        state.healthCertDaysRemaining == null -> "未知"
-                        state.healthCertDaysRemaining < 0 -> "过期"
-                        state.healthCertDaysRemaining < 7 -> "即将过期"
-                        else -> "有效"
-                    },
-                    symptomFlags = remark,
+                    handStatus = if (isHandNormal) HandStatus.NORMAL else HandStatus.ABNORMAL,
+                    healthCertStatus = healthCertStatus,
+                    symptomFlags = emptyList(),
                     faceImagePath = currentFacePath,
                     handPalmPath = currentPalmPath,
                     handBackPath = currentBackPath,
                     remark = remark
                 )
-                val recordId = recordRepository.insertRecord(record)
+                val saveResult = recordRepository.saveRecord(record)
+                val recordId = saveResult.getOrNull() ?: 0L
                 val savedRecord = record.copy(id = recordId)
                 Timber.d("Record saved: $savedRecord")
 
                 try {
                     withContext(Dispatchers.IO) {
-                        recordUploadReporter.upload(savedRecord)
+                        recordUploadReporter.upload(savedRecord.toEntity())
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to upload record")
@@ -937,7 +961,7 @@ class MainViewModel @Inject constructor(
         resetJob?.cancel()
         handCooldownJob?.cancel()
         autoSubmitJob?.cancel()
-        voicePrompter.shutdown()
+        voiceService.shutdown()
         Timber.d("MainViewModel cleared")
     }
 

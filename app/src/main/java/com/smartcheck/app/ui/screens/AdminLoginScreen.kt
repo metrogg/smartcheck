@@ -175,11 +175,12 @@ fun AdminLoginScreen(
             Spacer(modifier = Modifier.height(Dimens.PaddingLarge))
             Button(
                 onClick = {
-                    val ok = viewModel.login(account, password)
-                    if (ok) {
-                        onLoginSuccess()
-                    } else {
-                        error = "账号或密码错误"
+                    viewModel.login(account, password) { ok ->
+                        if (ok) {
+                            onLoginSuccess()
+                        } else {
+                            error = "账号或密码错误"
+                        }
                     }
                 },
                 modifier = Modifier

@@ -2,19 +2,34 @@ package com.smartcheck.app.viewmodel
 
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
-import com.smartcheck.app.data.db.UserEntity
-import com.smartcheck.app.data.repository.UserRepository
+import androidx.lifecycle.viewModelScope
+import com.smartcheck.app.domain.model.User
+import com.smartcheck.app.domain.repository.IUserRepository
 import com.smartcheck.app.ml.FaceEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class FaceTestViewModel @Inject constructor(
-    private val userRepository: UserRepository,
+    private val userRepository: IUserRepository,
     private val faceEngine: FaceEngine
 ) : ViewModel() {
 
-    suspend fun registerUserWithFrame(
+    fun registerUserWithFrame(
+        name: String,
+        employeeId: String,
+        department: String,
+        frame: Bitmap,
+        onResult: (Long?) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = registerUserWithFrameSuspend(name, employeeId, department, frame)
+            onResult(result)
+        }
+    }
+
+    private suspend fun registerUserWithFrameSuspend(
         name: String,
         employeeId: String,
         department: String,
@@ -26,24 +41,28 @@ class FaceTestViewModel @Inject constructor(
 
         if (trimmedEmployeeId.isEmpty() || trimmedName.isEmpty()) return null
 
-        val existing = userRepository.getUserByEmployeeId(trimmedEmployeeId)
+        val existingResult = userRepository.getUserByEmployeeId(trimmedEmployeeId)
 
-        val userId = if (existing == null) {
-            userRepository.insertUser(
-                UserEntity(
+        val userId = existingResult.fold(
+            onSuccess = { existing ->
+                val updated = existing.copy(
+                    name = trimmedName,
+                    department = trimmedDepartment
+                )
+                userRepository.updateUser(updated)
+                existing.id
+            },
+            onFailure = {
+                val newUser = User(
                     name = trimmedName,
                     employeeId = trimmedEmployeeId,
                     department = trimmedDepartment
                 )
-            )
-        } else {
-            val updated = existing.copy(
-                name = trimmedName,
-                department = trimmedDepartment
-            )
-            userRepository.updateUser(updated)
-            existing.id
-        }
+                userRepository.createUser(newUser).getOrNull()
+            }
+        )
+
+        if (userId == null) return null
 
         val ok = faceEngine.registerUser(userId, listOf(frame))
         if (!ok) return null

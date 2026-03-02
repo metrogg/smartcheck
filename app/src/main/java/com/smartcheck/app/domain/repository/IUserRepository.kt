@@ -1,0 +1,22 @@
+package com.smartcheck.app.domain.repository
+
+import com.smartcheck.app.domain.model.AppError
+import com.smartcheck.app.domain.model.User
+import kotlinx.coroutines.flow.Flow
+
+interface IUserRepository {
+
+    fun observeAllUsers(): Flow<List<User>>
+
+    suspend fun getUserById(id: Long): Result<User>
+
+    suspend fun getUserByEmployeeId(employeeId: String): Result<User>
+
+    suspend fun getUserByFaceFeature(embedding: ByteArray): Result<User>
+
+    suspend fun createUser(user: User): Result<Long>
+
+    suspend fun updateUser(user: User): Result<Unit>
+
+    suspend fun deleteUser(userId: Long): Result<Unit>
+}

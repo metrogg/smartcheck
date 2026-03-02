@@ -105,7 +105,6 @@ IDLE → FACE_PASS → TEMP_MEASURING → HAND_CHECKING → ALL_PASS
 
 - 红外测温模块
 - 蜂鸣器控制
-- 继电器（开门）
 
 ### 5. 数据持久化（Room）
 

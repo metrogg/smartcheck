@@ -22,7 +22,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.smartcheck.app.data.db.UserEntity
+import com.smartcheck.app.domain.model.User
 import com.smartcheck.app.ui.components.CameraType
 import com.smartcheck.app.ui.components.DualCameraPreview
 import com.smartcheck.app.ui.components.CameraPreview
@@ -300,7 +300,7 @@ fun EmployeeEnrollScreen(
                         isRegistering = true
                         resultText = null
                         try {
-                            val userId = viewModel.enrollWithFrame(
+                            viewModel.enrollWithFrame(
                                 name = name,
                                 employeeId = employeeId,
                                 department = department,
@@ -308,13 +308,15 @@ fun EmployeeEnrollScreen(
                                 healthCertImagePath = healthCertImagePath,
                                 healthCertStartDate = healthCertStartDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
                                 healthCertEndDate = healthCertEndDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
-                                frame = frame
+                                frame = frame,
+                                onResult = { userId ->
+                                    resultText = if (userId != null) {
+                                        "录入成功: userId=$userId"
+                                    } else {
+                                        "录入失败"
+                                    }
+                                }
                             )
-                            resultText = if (userId != null) {
-                                "录入成功: userId=$userId"
-                            } else {
-                                "录入失败"
-                            }
                         } catch (e: Exception) {
                             resultText = "录入异常"
                         } finally {
@@ -356,7 +358,7 @@ fun EmployeeEnrollScreen(
 }
 
 @Composable
-private fun UserRow(user: UserEntity) {
+private fun UserRow(user: User) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)

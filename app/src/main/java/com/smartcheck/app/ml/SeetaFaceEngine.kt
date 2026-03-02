@@ -4,8 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.SystemClock
-import com.smartcheck.app.data.db.UserEntity
-import com.smartcheck.app.data.repository.UserRepository
+import com.smartcheck.app.domain.model.User
+import com.smartcheck.app.domain.repository.IUserRepository
 import com.smartcheck.sdk.face.FaceInfo
 import com.smartcheck.sdk.face.FaceSdk
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,7 +22,7 @@ import javax.inject.Singleton
 @Singleton
 class SeetaFaceEngine @Inject constructor(
     @ApplicationContext private val appContext: Context,
-    private val userRepository: UserRepository
+    private val userRepository: IUserRepository
 ) : FaceEngine {
 
     private var isInitialized = false
@@ -117,9 +117,9 @@ class SeetaFaceEngine @Inject constructor(
                     }
                 }
 
-                val users = userRepository.getAllActiveUsers().first()
+                val users = userRepository.observeAllUsers().first()
 
-                var bestUser: UserEntity? = null
+                var bestUser: User? = null
                 var bestSim = 0.0f
 
                 val compareStart = SystemClock.elapsedRealtime()
@@ -177,7 +177,8 @@ class SeetaFaceEngine @Inject constructor(
         if (!isInitialized) return false
 
         return withContext(Dispatchers.Default) {
-            val user = userRepository.getUserById(userId) ?: return@withContext false
+            val userResult = userRepository.getUserById(userId)
+            val user = userResult.getOrNull() ?: return@withContext false
             if (frames.isEmpty()) return@withContext false
 
             var sum: FloatArray? = null
