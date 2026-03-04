@@ -3,8 +3,11 @@ package com.smartcheck.app.di
 import android.content.Context
 import android.os.Build
 import androidx.room.Room
+import com.smartcheck.app.data.db.ApiAccessLogDao
+import com.smartcheck.app.data.db.ApiTokenDao
 import com.smartcheck.app.data.db.AppDatabase
 import com.smartcheck.app.data.db.RecordDao
+import com.smartcheck.app.data.db.SystemUserDao
 import com.smartcheck.app.data.db.UserDao
 import com.smartcheck.app.data.repository.AdminAuthRepository
 import com.smartcheck.app.data.repository.RecordRepository
@@ -82,7 +85,9 @@ object AppModule {
                 AppDatabase.MIGRATION_1_2,
                 AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4,
-                AppDatabase.MIGRATION_4_5
+                AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6,
+                AppDatabase.MIGRATION_6_7
             )
             .build()
     }
@@ -103,6 +108,33 @@ object AppModule {
     @Singleton
     fun provideRecordDao(database: AppDatabase): RecordDao {
         return database.recordDao()
+    }
+
+    /**
+     * 提供 ApiTokenDao
+     */
+    @Provides
+    @Singleton
+    fun provideApiTokenDao(database: AppDatabase): ApiTokenDao {
+        return database.apiTokenDao()
+    }
+
+    /**
+     * 提供 ApiAccessLogDao
+     */
+    @Provides
+    @Singleton
+    fun provideApiAccessLogDao(database: AppDatabase): ApiAccessLogDao {
+        return database.apiAccessLogDao()
+    }
+
+    /**
+     * 提供 SystemUserDao
+     */
+    @Provides
+    @Singleton
+    fun provideSystemUserDao(database: AppDatabase): SystemUserDao {
+        return database.systemUserDao()
     }
 
     @Provides

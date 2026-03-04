@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import timber.log.Timber
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -272,9 +273,8 @@ fun HomeScreen(
                         viewWidth = previewWidth,
                         viewHeight = previewHeight,
                         mirrorX = isMirrored,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize()
                     )
+                    Timber.d("[HomeScreen] 画框: faceBoxes=$faceBoxes, frame=(${lastFrameWidth}x${lastFrameHeight}), view=(${previewWidth}x${previewHeight}), mirror=$isMirrored")
                 }
 
                 if (cameraInitState == com.smartcheck.app.ui.components.CameraInitState.Ready && isHandStage) {

@@ -146,10 +146,8 @@ fun AdminScreen(
                             record = record,
                             onView = {
                                 selectedRecord = record
-                                onNavigateRecordDetail?.invoke(record.id)
                             },
                             onEdit = {
-                                selectedRecord = record
                                 onNavigateRecordDetail?.invoke(record.id)
                             },
                             onClick = { selectedRecord = record }

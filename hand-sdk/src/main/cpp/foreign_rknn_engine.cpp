@@ -10,7 +10,7 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 #define MODEL_INPUT_SIZE 640
-#define CONF_THRESHOLD 0.25f
+#define CONF_THRESHOLD 0.5f
 #define NMS_THRESHOLD 0.45f
 #define NUM_KEYPOINTS 21
 

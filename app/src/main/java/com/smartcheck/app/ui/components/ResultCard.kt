@@ -86,5 +86,6 @@ private fun getStateColor(state: CheckState): Color {
         CheckState.SYMPTOM_FAIL -> Color(0xFFF44336) // 红色
         CheckState.AUTO_SUBMITTING -> Color(0xFF4CAF50) // 绿色
         CheckState.ALL_PASS -> Color(0xFF4CAF50) // 绿色
+        CheckState.HEALTH_CERT_EXPIRED -> Color(0xFFF44336) // 红色
     }
 }

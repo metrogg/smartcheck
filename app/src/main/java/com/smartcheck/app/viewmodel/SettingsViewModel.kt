@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcheck.app.data.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import com.smartcheck.app.data.repository.AdminAuthRepository
 import kotlinx.coroutines.Dispatchers
@@ -22,9 +24,22 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
+    private val _account = MutableStateFlow("admin")
+    val account: StateFlow<String> = _account.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            adminAuthRepository.observeAccount().collect { value ->
+                if (value != null) {
+                    _account.value = value
+                }
+            }
+        }
+    }
+
     val voiceEnabled: StateFlow<Boolean> = settingsRepository.voiceEnabled
     val adminName: StateFlow<String> = settingsRepository.adminName
-    val account: StateFlow<String> = settingsRepository.account
+    
     val canteenName: StateFlow<String> = settingsRepository.canteenName
     val loginTitle: StateFlow<String> = settingsRepository.loginTitle
     val loginBackground: StateFlow<String> = settingsRepository.loginBackground

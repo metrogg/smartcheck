@@ -128,7 +128,32 @@ object HandDetector {
         
         try {
             val results = nativeDetect(bitmap)
-            return results?.toList() ?: emptyList()
+            val handList = results?.toList() ?: emptyList()
+            
+            // 记录手部检测结果详情
+            if (handList.isNotEmpty()) {
+                Log.i(TAG, "[手部检测] 检测到 ${handList.size} 只手")
+                handList.forEachIndexed { index, hand ->
+                    Log.i(TAG, "[手部检测] 手 #$index: " +
+                            "label=${hand.label}, " +
+                            "hasForeignObject=${hand.hasForeignObject}, " +
+                            "score=${String.format("%.2f", hand.score)}, " +
+                            "foreignObjects=${hand.foreignObjects.size}")
+                    
+                    // 记录异物详情
+                    hand.foreignObjects.forEachIndexed { objIndex, obj ->
+                        Log.i(TAG, "[手部检测] 异物 #$objIndex: " +
+                                "label=${obj.label}, " +
+                                "score=${String.format("%.2f", obj.score)}, " +
+                                "box=[${String.format("%.1f", obj.box.left)}, " +
+                                "${String.format("%.1f", obj.box.top)}, " +
+                                "${String.format("%.1f", obj.box.width())}, " +
+                                "${String.format("%.1f", obj.box.height())}]")
+                    }
+                }
+            }
+            
+            return handList
         } catch (e: Exception) {
             Log.e(TAG, "Exception during detection", e)
             return emptyList()

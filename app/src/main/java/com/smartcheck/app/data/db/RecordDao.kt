@@ -14,6 +14,12 @@ interface RecordDao {
     
     @Query("SELECT * FROM check_records WHERE checkTime >= :startTime AND checkTime <= :endTime ORDER BY checkTime DESC")
     fun getRecordsByTimeRange(startTime: Long, endTime: Long): Flow<List<RecordEntity>>
+
+    @Query("SELECT * FROM check_records WHERE checkTime >= :startTime AND checkTime <= :endTime ORDER BY checkTime DESC")
+    suspend fun getRecordsByTimeRangeSync(startTime: Long, endTime: Long): List<RecordEntity>
+
+    @Query("SELECT * FROM check_records WHERE id > :lastId ORDER BY id ASC LIMIT :limit")
+    suspend fun getRecordsAfterId(lastId: Long, limit: Int): List<RecordEntity>
     
     @Insert
     suspend fun insertRecord(record: RecordEntity): Long

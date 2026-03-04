@@ -1,6 +1,7 @@
 package com.smartcheck.app.viewmodel
 
 import com.smartcheck.sdk.HandInfo
+import timber.log.Timber
 
 /**
  * 晨检状态枚举
@@ -19,7 +20,8 @@ enum class CheckState {
     HAND_PALM_CHECKING,
     HAND_BACK_CHECKING,
     SYMPTOM_CHECKING,
-    SYMPTOM_FAIL
+    SYMPTOM_FAIL,
+    HEALTH_CERT_EXPIRED  // 健康证过期：禁止上岗
 }
 
 /**
@@ -55,3 +57,71 @@ data class UiState(
     val faceConfidence: Float = 0.0f,
     val handDetectionResults: List<String> = emptyList()
 )
+
+/**
+ * 晨检状态转换日志记录器
+ */
+object MorningCheckLogger {
+    private const val TAG = "[晨检流程]"
+    
+    private var lastState: CheckState = CheckState.IDLE
+    private var stateEnterTime: Long = System.currentTimeMillis()
+    
+    /**
+     * 记录状态转换
+     */
+    fun logStateTransition(from: CheckState, to: CheckState) {
+        val duration = System.currentTimeMillis() - stateEnterTime
+        Timber.tag(TAG).i("状态转换: $from -> $to (耗时: ${duration}ms)")
+        lastState = to
+        stateEnterTime = System.currentTimeMillis()
+    }
+    
+    /**
+     * 记录人脸识别结果
+     */
+    fun logFaceRecognized(userId: Long, name: String, confidence: Float) {
+        Timber.tag(TAG).i("人脸识别: userId=$userId, name=$name, confidence=${String.format("%.2f", confidence)}")
+    }
+    
+    /**
+     * 记录体温测量结果
+     */
+    fun logTemperature(temp: Float, isNormal: Boolean) {
+        val status = if (isNormal) "正常" else "异常"
+        Timber.tag(TAG).i("体温测量: ${String.format("%.1f", temp)}°C, 状态=$status")
+    }
+    
+    /**
+     * 记录手部检测结果
+     */
+    fun logHandCheck(handCount: Int, hasIssue: Boolean, details: List<String> = emptyList()) {
+        val status = if (hasIssue) "异常" else "正常"
+        Timber.tag(TAG).i("手部检测: 数量=$handCount, 状态=$status")
+        details.forEach { detail ->
+            Timber.tag(TAG).i("  - $detail")
+        }
+    }
+    
+    /**
+     * 记录晨检完成
+     */
+    fun logComplete(recordId: Long?, totalDurationMs: Long, isPassed: Boolean) {
+        val result = if (isPassed) "通过" else "未通过"
+        Timber.tag(TAG).i("晨检完成: recordId=$recordId, 结果=$result, 总耗时=${totalDurationMs}ms")
+    }
+    
+    /**
+     * 记录错误信息
+     */
+    fun logError(step: String, error: String) {
+        Timber.tag(TAG).e("错误 [$step]: $error")
+    }
+    
+    /**
+     * 记录警告信息
+     */
+    fun logWarning(step: String, message: String) {
+        Timber.tag(TAG).w("警告 [$step]: $message")
+    }
+}

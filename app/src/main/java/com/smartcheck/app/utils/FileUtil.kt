@@ -2,6 +2,9 @@ package com.smartcheck.app.utils
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
@@ -37,10 +40,37 @@ object FileUtil {
 
     fun getRecordImageFile(context: Context, pathOrName: String?): File? {
         if (pathOrName.isNullOrBlank()) return null
+
+        if (pathOrName.startsWith("content://")) {
+            Timber.tag("FileUtil").d("Handling content URI: $pathOrName")
+            try {
+                val uri = Uri.parse(pathOrName)
+                val inputStream = context.contentResolver.openInputStream(uri)
+                if (inputStream != null) {
+                    inputStream.close()
+                    return null
+                }
+            } catch (e: Exception) {
+                Timber.tag("FileUtil").w("Cannot access content URI: $pathOrName, error: ${e.message}")
+            }
+            return null
+        }
+
         return if (pathOrName.startsWith("/")) {
-            File(pathOrName)
+            val file = File(pathOrName)
+            if (file.exists()) file else null
         } else {
             File(getRecordsDir(context), pathOrName)
+        }
+    }
+
+    fun loadBitmapFromInternal(context: Context, pathOrName: String?): Bitmap? {
+        val file = getRecordImageFile(context, pathOrName) ?: return null
+        return try {
+            BitmapFactory.decodeFile(file.absolutePath)
+        } catch (e: Exception) {
+            Timber.tag("FileUtil").e(e, "Failed to load bitmap: ${file.absolutePath}")
+            null
         }
     }
 

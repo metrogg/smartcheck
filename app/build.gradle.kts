@@ -9,6 +9,15 @@ android {
     namespace = "com.smartcheck.app"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("smartcheck.jks")
+            storePassword = "123456"
+            keyAlias = "smartcheck"
+            keyPassword = "123456"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.smartcheck.app"
         minSdk = 26
@@ -25,6 +34,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = android.signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -53,6 +63,8 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
         }
 
         jniLibs {
@@ -114,6 +126,31 @@ dependencies {
 
     // Coil (Image Loading)
     implementation("io.coil-kt:coil-compose:2.5.0")
+    
+    // Ktor (HTTP Server)
+    implementation("io.ktor:ktor-server-core:2.3.7")
+    implementation("io.ktor:ktor-server-netty:2.3.7")
+    implementation("io.ktor:ktor-server-content-negotiation:2.3.7")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
+    implementation("io.ktor:ktor-server-auth:2.3.7")
+    implementation("io.ktor:ktor-server-auth-jwt:2.3.7") {
+        exclude(group = "com.google.guava")
+    }
+    implementation("io.ktor:ktor-server-cors:2.3.7")
+    implementation("io.ktor:ktor-server-status-pages:2.3.7")
+    
+    // JWT
+    implementation("com.auth0:java-jwt:4.4.0") {
+        exclude(group = "com.google.guava")
+    }
+    
+    // Guava - 解决依赖冲突
+    implementation("com.google.guava:guava:32.1.3-android") {
+        exclude(group = "com.google.code.findbugs")
+        exclude(group = "org.checkerframework")
+        exclude(group = "com.google.errorprone")
+        exclude(group = "com.google.j2objc")
+    }
     
     // Testing
     testImplementation("junit:junit:4.13.2")

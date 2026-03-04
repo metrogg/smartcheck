@@ -14,6 +14,8 @@ object FaceSdk {
     private const val FD_MODEL_NAME = "face_detector.csta"
     private const val LM_MODEL_NAME = "face_landmarker_pts5.csta"
     private const val FR_MODEL_NAME = "face_recognizer.csta"
+    private const val FAS_MODEL_NAME_1 = "fas_first.csta"
+    private const val FAS_MODEL_NAME_2 = "fas_second.csta"
 
     // Logged for diagnostics (from the bundled SF6 dev kit).
     private const val FD_MODEL_MD5 = "C51F6A439E8A9A3749BD97E93364A71C"
@@ -137,15 +139,19 @@ object FaceSdk {
             context.assets.open(FD_MODEL_NAME).close()
             context.assets.open(LM_MODEL_NAME).close()
             context.assets.open(FR_MODEL_NAME).close()
+            context.assets.open(FAS_MODEL_NAME_1).close()
+            context.assets.open(FAS_MODEL_NAME_2).close()
         } catch (e: Exception) {
             Log.e(TAG, "Model files not found in assets/")
-            Log.e(TAG, "Required files: $FD_MODEL_NAME, $LM_MODEL_NAME, $FR_MODEL_NAME")
+            Log.e(TAG, "Required files: $FD_MODEL_NAME, $LM_MODEL_NAME, $FR_MODEL_NAME, $FAS_MODEL_NAME_1, $FAS_MODEL_NAME_2")
             return -1
         }
 
         val fdPath = ensureAssetCopied(context, FD_MODEL_NAME)
         val lmPath = ensureAssetCopied(context, LM_MODEL_NAME)
         val frPath = ensureAssetCopied(context, FR_MODEL_NAME)
+        val fasPath1 = ensureAssetCopied(context, FAS_MODEL_NAME_1)
+        val fasPath2 = ensureAssetCopied(context, FAS_MODEL_NAME_2)
 
         try {
             val fdMd5 = md5OfFile(File(fdPath))
@@ -166,7 +172,7 @@ object FaceSdk {
         }
 
         val ret = try {
-            nativeInit(fdPath, lmPath, frPath)
+            nativeInit(fdPath, lmPath, frPath, fasPath1, fasPath2)
         } catch (t: Throwable) {
             lastInitError = "nativeInit threw ${t::class.java.simpleName}: ${t.message}"
             Log.e(TAG, "nativeInit threw", t)
@@ -212,7 +218,7 @@ object FaceSdk {
         }
     }
 
-    private external fun nativeInit(fdModelPath: String, lmModelPath: String, frModelPath: String): Int
+    private external fun nativeInit(fdModelPath: String, lmModelPath: String, frModelPath: String, fasModelPath1: String, fasModelPath2: String): Int
 
     private external fun nativeDetect(bitmap: Bitmap): Array<FaceInfo>?
 
@@ -220,5 +226,66 @@ object FaceSdk {
 
     private external fun nativeCalculateSimilarity(feature1: FloatArray, feature2: FloatArray): Float
 
+    private external fun nativeDetectLiveness(bitmap: Bitmap): Int
+
     private external fun nativeRelease()
+
+    fun detectLiveness(bitmap: Bitmap): LivenessResult {
+        if (!isInitialized) {
+            Log.w(TAG, "FaceSdk not initialized")
+            return LivenessResult(LivenessStatus.ERROR, 0f, 0f)
+        }
+
+        return try {
+            val status = nativeDetectLiveness(bitmap)
+            LivenessResult(
+                status = LivenessStatus.fromCode(status),
+                clarity = 0f,
+                reality = 0f
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during liveness detection", e)
+            LivenessResult(LivenessStatus.ERROR, 0f, 0f)
+        }
+    }
+
+    fun track(bitmap: Bitmap): List<FaceInfo> {
+        if (!isInitialized) {
+            Log.w(TAG, "FaceSdk not initialized")
+            return emptyList()
+        }
+
+        return try {
+            val results = nativeTrack(bitmap)
+            results?.toList() ?: emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during tracking", e)
+            emptyList()
+        }
+    }
+
+    private external fun nativeTrack(bitmap: Bitmap): Array<FaceInfo>?
+}
+
+enum class LivenessStatus(val code: Int) {
+    REAL(0),
+    SPOOF(1),
+    FUZZY(2),
+    DETECTING(3),
+    ERROR(-1);
+
+    companion object {
+        fun fromCode(code: Int): LivenessStatus {
+            return entries.find { it.code == code } ?: ERROR
+        }
+    }
+}
+
+data class LivenessResult(
+    val status: LivenessStatus,
+    val clarity: Float,
+    val reality: Float
+) {
+    val isLive: Boolean
+        get() = status == LivenessStatus.REAL
 }

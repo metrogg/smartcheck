@@ -20,7 +20,12 @@ import com.smartcheck.app.domain.repository.IVoiceService
 import com.smartcheck.app.domain.usecase.HandCheckResult
 import com.smartcheck.app.domain.usecase.ImageStorageUseCase
 import com.smartcheck.app.domain.usecase.MorningCheckUseCase
+import com.smartcheck.app.domain.usecase.PerformanceMetrics
+import com.smartcheck.app.domain.usecase.ActionType
+import com.smartcheck.app.domain.usecase.UserActionTracker
 import com.smartcheck.app.ml.FaceEngine
+import com.smartcheck.app.ml.SeetaFaceEngine
+import com.smartcheck.sdk.face.FaceSdk
 import com.smartcheck.sdk.HandDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -105,6 +110,12 @@ class MainViewModel @Inject constructor(
     private var faceSaveJob: Job? = null
     private var palmSaveJob: Job? = null
     private var backSaveJob: Job? = null
+    
+    // 人脸跟踪状态
+    private var lastTrackingId: Int = -1
+    private var stableFramesCount: Int = 0
+    private val requiredStableFrames: Int = 3 // 连续3帧稳定才识别
+    private var lastRecognizedUserId: Long? = null // 上次识别成功的用户ID，避免重复识别
 
     private val minFreeBytes = 200L * 1024L * 1024L
 
@@ -124,6 +135,17 @@ class MainViewModel @Inject constructor(
                 voiceService.setEnabled(enabled)
             }
         }
+    }
+    
+    /**
+     * 状态转换辅助函数，自动记录日志
+     */
+    private fun transitionTo(newState: CheckState, update: (UiState) -> UiState = { it.copy(state = newState) }) {
+        val oldState = _uiState.value.state
+        if (oldState != newState) {
+            MorningCheckLogger.logStateTransition(oldState, newState)
+        }
+        _uiState.update(update)
     }
 
     fun processFrame(frame: Bitmap) {
@@ -202,27 +224,72 @@ class MainViewModel @Inject constructor(
         faceDetectJob = viewModelScope.launch {
             val safeBitmap = frame.copy(Bitmap.Config.ARGB_8888, true)
             try {
-                val startAt = SystemClock.elapsedRealtime()
-                val result = withContext(NonCancellable) {
-                    faceEngine.detectAndRecognize(safeBitmap)
+                // 1. 使用跟踪获取人脸位置
+                val trackedFaces = withContext(Dispatchers.Default) {
+                    FaceSdk.track(safeBitmap)
                 }
-                val elapsed = SystemClock.elapsedRealtime() - startAt
-                _perfMetrics.update { it.copy(faceDuration = elapsed.milliseconds) }
-                _faceDetectionBoxes.value = if (result != null && !result.boundingBox.isEmpty) {
-                    listOf(result.boundingBox)
+                
+                // 2. 更新框（即使没识别也画框）
+                if (trackedFaces.isNotEmpty()) {
+                    val bestFace = trackedFaces.first()
+                    Timber.d("[人脸跟踪] 框位置: left=${bestFace.box.left}, top=${bestFace.box.top}, right=${bestFace.box.right}, bottom=${bestFace.box.bottom}")
+                    _faceDetectionBoxes.value = listOf(
+                        Rect(
+                            bestFace.box.left.toInt(),
+                            bestFace.box.top.toInt(),
+                            bestFace.box.right.toInt(),
+                            bestFace.box.bottom.toInt()
+                        )
+                    )
+                    
+                    // 3. 跟踪逻辑：判断是否是同一个人
+                    val currentTrackingId = bestFace.id
+                    
+                    if (currentTrackingId == lastTrackingId) {
+                        // 同一跟踪ID，增加稳定计数
+                        stableFramesCount++
+                        Timber.d("[人脸跟踪] 跟踪ID=$currentTrackingId, 稳定帧数=$stableFramesCount/$requiredStableFrames")
+                        
+                        // 4. 连续稳定且未识别过此人脸时才识别
+                        if (stableFramesCount >= requiredStableFrames && 
+                            lastRecognizedUserId == null) {
+                            // 进行识别
+                            val result = withContext(NonCancellable) {
+                                faceEngine.detectAndRecognize(safeBitmap)
+                            }
+                            
+                            if (result != null && result.userId != null) {
+                                lastRecognizedUserId = result.userId
+                                onFaceRecognized(result.userId, result.userName ?: "未知用户", result.confidence)
+                            }
+                        }
+                    } else {
+                        // 换人，重置跟踪状态
+                        if (lastTrackingId != -1) {
+                            Timber.d("[人脸跟踪] 换人: $lastTrackingId -> $currentTrackingId")
+                        }
+                        lastTrackingId = currentTrackingId
+                        stableFramesCount = 1
+                        lastRecognizedUserId = null
+                        _uiState.update { it.copy(message = "请正视摄像头") }
+                    }
                 } else {
-                    emptyList()
-                }
-
-                if (result != null && result.userId != null) {
-                    onFaceRecognized(result.userId, result.userName ?: "未知用户", result.confidence)
-                } else {
+                    // 没检测到人脸，重置跟踪状态
+                    _faceDetectionBoxes.value = emptyList()
+                    if (lastTrackingId != -1) {
+                        Timber.d("[人脸跟踪] 丢失目标，重置跟踪")
+                    }
+                    lastTrackingId = -1
+                    stableFramesCount = 0
+                    lastRecognizedUserId = null
                     _uiState.update { it.copy(message = "请正视摄像头") }
                 }
+                
             } catch (e: CancellationException) {
                 // Normal control flow
             } catch (e: Exception) {
-                Timber.tag("MainViewModel").e(e, "Face recognition error")
+                Timber.tag("MainViewModel").e(e, "Face tracking error")
+                _faceDetectionBoxes.value = emptyList()
             } finally {
                 safeBitmap.safeRecycle()
                 frame.safeRecycle()
@@ -237,11 +304,14 @@ class MainViewModel @Inject constructor(
         if (_uiState.value.state != CheckState.IDLE) return
         Timber.tag("MainViewModel").d("Face recognized: $userName (confidence: $confidence)")
 
+        val startTime = System.currentTimeMillis()
+
         viewModelScope.launch {
             val result = morningCheckUseCase.onFaceRecognized(userId, userName, confidence)
+
             _uiState.update {
                 it.copy(
-                    state = CheckState.FACE_PASS,
+                    state = if (result.isAllowedToContinue) CheckState.FACE_PASS else CheckState.HEALTH_CERT_EXPIRED,
                     currentUserId = result.userId,
                     currentUserName = result.userName,
                     healthCertEndDate = result.healthCertEndDate,
@@ -250,29 +320,35 @@ class MainViewModel @Inject constructor(
                     message = result.message
                 )
             }
-        }
 
-        faceSaveJob?.cancel()
-        faceSaveJob = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val bitmap = currentFaceBitmap ?: return@launch
-                val result = imageStorageUseCase.saveFaceImage(bitmap)
-                result.onSuccess { name ->
-                    currentFacePath = name
-                    _uiState.update { it.copy(faceImagePath = name) }
-                }.onFailure {
-                    _uiState.update { it.copy(message = "照片保存失败") }
-                }
-                bitmap.recycle()
-                currentFaceBitmap = null
-            } catch (e: Exception) {
-                Timber.tag("MainViewModel").e(e, "Failed to save face snapshot")
+            PerformanceMetrics.recordDuration("face_recognition", System.currentTimeMillis() - startTime)
+            UserActionTracker.track(ActionType.FACE_RECOGNIZED, "MainScreen", "userId=$userId, name=$userName")
+
+            if (!result.isAllowedToContinue) {
+                hardwareRepository.beep("error")
+                scheduleReset(5000)
+                return@launch
             }
-        }
-        
-        hardwareRepository.beep("success")
-        
-        viewModelScope.launch {
+
+            faceSaveJob?.cancel()
+            faceSaveJob = viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val bitmap = currentFaceBitmap ?: return@launch
+                    val saveResult = imageStorageUseCase.saveFaceImage(bitmap)
+                    saveResult.onSuccess { name ->
+                        currentFacePath = name
+                        _uiState.update { it.copy(faceImagePath = name) }
+                    }.onFailure {
+                        _uiState.update { it.copy(message = "照片保存失败") }
+                    }
+                    bitmap.recycle()
+                    currentFaceBitmap = null
+                } catch (e: Exception) {
+                    Timber.tag("MainViewModel").e(e, "Failed to save face snapshot")
+                }
+            }
+
+            hardwareRepository.beep("success")
             delay(1000)
             startTemperatureMeasure()
         }
@@ -371,6 +447,8 @@ class MainViewModel @Inject constructor(
             )
         }
         morningCheckUseCase.speakHandCheckPass()
+
+        UserActionTracker.track(ActionType.HAND_CHECK_COMPLETED, "MainScreen", "result=pass")
     }
     
     /**
@@ -674,6 +752,8 @@ class MainViewModel @Inject constructor(
 
         _uiState.update { it.copy(isSubmitting = true) }
 
+        val startTime = System.currentTimeMillis()
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 faceSaveJob?.join()
@@ -709,6 +789,15 @@ class MainViewModel @Inject constructor(
                 val recordId = saveResult.getOrNull() ?: 0L
                 val savedRecord = record.copy(id = recordId)
                 Timber.tag("MainViewModel").d("Record saved: $savedRecord")
+
+                val duration = System.currentTimeMillis() - startTime
+                PerformanceMetrics.recordDuration("record_save", duration)
+                UserActionTracker.track(
+                    ActionType.RECORD_SUBMITTED,
+                    "MainScreen",
+                    "userId=${state.currentUserId}, passed=$isPassed",
+                    durationMs = duration
+                )
 
                 try {
                     withContext(Dispatchers.IO) {
@@ -762,6 +851,11 @@ class MainViewModel @Inject constructor(
         currentFacePath = null
         currentPalmPath = null
         currentBackPath = null
+        
+        // 重置人脸跟踪状态
+        lastTrackingId = -1
+        stableFramesCount = 0
+        lastRecognizedUserId = null
         currentFaceBitmap.safeRecycle()
         currentPalmBitmap.safeRecycle()
         currentBackBitmap.safeRecycle()

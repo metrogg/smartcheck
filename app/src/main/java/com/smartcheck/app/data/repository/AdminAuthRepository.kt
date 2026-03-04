@@ -3,17 +3,19 @@ package com.smartcheck.app.data.repository
 import android.content.Context
 import com.smartcheck.app.domain.model.AppError
 import com.smartcheck.app.domain.repository.IAdminAuthService
+import com.smartcheck.app.utils.DeviceAuth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import timber.log.Timber
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class AdminAuthRepository @Inject constructor(
-    @ApplicationContext context: Context
+    @ApplicationContext private val context: Context
 ) : IAdminAuthService {
 
     private val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -34,11 +36,19 @@ class AdminAuthRepository @Inject constructor(
     }
 
     override suspend fun login(account: String, password: String): Result<String> {
+        // 检查是否已激活
+        if (!DeviceAuth.isActivated()) {
+            Timber.d("[AdminAuth] 设备未激活")
+            return Result.failure(AppError.Unauthorized("请先激活设备"))
+        } else {
+            Timber.d("[AdminAuth] 设备已激活")
+        }
+
         val storedAccount = prefs.getString(KEY_ACCOUNT, DEFAULT_ACCOUNT) ?: DEFAULT_ACCOUNT
         if (!storedAccount.equals(account.trim(), ignoreCase = false)) {
-            return Result.failure(AppError.Unauthorized)
+            return Result.failure(AppError.Unauthorized("账号错误"))
         }
-        val expectedHash = prefs.getString(KEY_PASSWORD_HASH, null) ?: return Result.failure(AppError.Unauthorized)
+        val expectedHash = prefs.getString(KEY_PASSWORD_HASH, null) ?: return Result.failure(AppError.Unauthorized("密码未设置"))
         val inputHash = sha256(password.trim())
         val ok = expectedHash.equals(inputHash, ignoreCase = true)
         if (ok) {
@@ -46,7 +56,7 @@ class AdminAuthRepository @Inject constructor(
             _isLoggedIn.value = true
             return Result.success("token_$account")
         }
-        return Result.failure(AppError.Unauthorized)
+        return Result.failure(AppError.Unauthorized("密码错误"))
     }
 
     override suspend fun logout(): Result<Unit> {
@@ -56,10 +66,10 @@ class AdminAuthRepository @Inject constructor(
     }
 
     override suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit> {
-        val expectedHash = prefs.getString(KEY_PASSWORD_HASH, null) ?: return Result.failure(AppError.Unauthorized)
+        val expectedHash = prefs.getString(KEY_PASSWORD_HASH, null) ?: return Result.failure(AppError.Unauthorized("无法验证"))
         val inputHash = sha256(currentPassword.trim())
         if (!expectedHash.equals(inputHash, ignoreCase = true)) {
-            return Result.failure(AppError.Unauthorized)
+            return Result.failure(AppError.Unauthorized("原密码错误"))
         }
         val hash = sha256(newPassword.trim())
         prefs.edit()
@@ -71,10 +81,10 @@ class AdminAuthRepository @Inject constructor(
     }
 
     override suspend fun changeAccount(newAccount: String, password: String): Result<Unit> {
-        val expectedHash = prefs.getString(KEY_PASSWORD_HASH, null) ?: return Result.failure(AppError.Unauthorized)
+        val expectedHash = prefs.getString(KEY_PASSWORD_HASH, null) ?: return Result.failure(AppError.Unauthorized("无法验证"))
         val inputHash = sha256(password.trim())
         if (!expectedHash.equals(inputHash, ignoreCase = true)) {
-            return Result.failure(AppError.Unauthorized)
+            return Result.failure(AppError.Unauthorized("密码错误"))
         }
         val trimmed = newAccount.trim()
         if (trimmed.isEmpty()) {
@@ -113,6 +123,16 @@ class AdminAuthRepository @Inject constructor(
         _isLoggedIn.value = false
     }
 
+    fun verifyPassword(username: String, password: String): Boolean {
+        val storedAccount = prefs.getString(KEY_ACCOUNT, DEFAULT_ACCOUNT) ?: DEFAULT_ACCOUNT
+        if (!storedAccount.equals(username.trim(), ignoreCase = false)) {
+            return false
+        }
+        val expectedHash = prefs.getString(KEY_PASSWORD_HASH, null) ?: return false
+        val inputHash = sha256(password.trim())
+        return expectedHash.equals(inputHash, ignoreCase = true)
+    }
+
     private fun sha256(text: String): String {
         val md = MessageDigest.getInstance("SHA-256")
         val bytes = md.digest(text.toByteArray(Charsets.UTF_8))
@@ -126,6 +146,7 @@ class AdminAuthRepository @Inject constructor(
         private const val KEY_ACCOUNT = "account"
 
         const val DEFAULT_ACCOUNT = "admin"
-        const val DEFAULT_PASSWORD = "123456"
+        // 默认密码为空，强制首次登录时设置密码
+        const val DEFAULT_PASSWORD = ""
     }
 }

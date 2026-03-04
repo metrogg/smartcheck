@@ -4,17 +4,20 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.SystemClock
-import com.smartcheck.app.domain.model.User
 import com.smartcheck.app.domain.repository.IUserRepository
 import com.smartcheck.sdk.face.FaceInfo
 import com.smartcheck.sdk.face.FaceSdk
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,6 +33,40 @@ class SeetaFaceEngine @Inject constructor(
     private val initInProgress = AtomicBoolean(false)
     private val initLock = Any()
     @Volatile private var lastPerfLogAt = 0L
+
+    private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    data class CachedUser(
+        val id: Long,
+        val name: String,
+        val feature: FloatArray
+    )
+
+    private val userFeatureCache = ConcurrentHashMap<Long, CachedUser>()
+
+    fun refreshUserCache() {
+        engineScope.launch {
+            try {
+                val users = userRepository.observeAllUsers().first()
+                val newCache = ConcurrentHashMap<Long, CachedUser>()
+                for (user in users) {
+                    val bytes = user.faceEmbedding ?: continue
+                    val feature = byteArrayToFloatArray(bytes) ?: continue
+                    newCache[user.id] = CachedUser(user.id, user.name, feature)
+                }
+                userFeatureCache.clear()
+                userFeatureCache.putAll(newCache)
+                Timber.d("[FaceEngine] 用户特征缓存已刷新: ${newCache.size} 个用户")
+            } catch (e: Exception) {
+                Timber.e(e, "[FaceEngine] 刷新用户缓存失败")
+            }
+        }
+    }
+
+    fun clearUserCache() {
+        userFeatureCache.clear()
+        Timber.d("[FaceEngine] 用户特征缓存已清空")
+    }
 
     override fun init(context: Context) {
         ensureInit(context, "sync")
@@ -69,6 +106,7 @@ class SeetaFaceEngine @Inject constructor(
                 )
             } else {
                 Timber.i("SeetaFaceEngine init ok (%s) time=%dms", source, elapsed)
+                refreshUserCache()
             }
         }
     }
@@ -86,7 +124,21 @@ class SeetaFaceEngine @Inject constructor(
                 val detectStart = SystemClock.elapsedRealtime()
                 val faces = FaceSdk.detect(frame)
                 val detectMs = SystemClock.elapsedRealtime() - detectStart
-                val bestFace: FaceInfo? = faces.maxByOrNull { it.score }
+
+                if (faces.isEmpty()) {
+                    maybeLogPerf(
+                        totalMs = SystemClock.elapsedRealtime() - totalStart,
+                        detectMs = detectMs,
+                        featureMs = 0L,
+                        compareMs = 0L,
+                        users = userFeatureCache.size,
+                        faces = 0,
+                        bestSim = 0f
+                    )
+                    return@withContext null
+                }
+
+                val bestFace = faces.maxByOrNull { it.score }
                 val bbox = bestFace?.box?.let {
                     Rect(it.left.toInt(), it.top.toInt(), it.right.toInt(), it.bottom.toInt())
                 } ?: Rect()
@@ -94,13 +146,14 @@ class SeetaFaceEngine @Inject constructor(
                 val featureStart = SystemClock.elapsedRealtime()
                 val feature = FaceSdk.extractFeature(frame)
                 val featureMs = SystemClock.elapsedRealtime() - featureStart
+
                 if (feature == null) {
                     maybeLogPerf(
                         totalMs = SystemClock.elapsedRealtime() - totalStart,
                         detectMs = detectMs,
                         featureMs = featureMs,
                         compareMs = 0L,
-                        users = 0,
+                        users = userFeatureCache.size,
                         faces = faces.size,
                         bestSim = 0f
                     )
@@ -117,39 +170,43 @@ class SeetaFaceEngine @Inject constructor(
                     }
                 }
 
-                val users = userRepository.observeAllUsers().first()
+                if (userFeatureCache.isEmpty()) {
+                    refreshUserCache()
+                }
 
-                var bestUser: User? = null
+                val cachedUsers = userFeatureCache.values.toList()
+
+                var bestUserId: Long? = null
+                var bestUserName: String? = null
                 var bestSim = 0.0f
 
                 val compareStart = SystemClock.elapsedRealtime()
-                for (user in users) {
-                    val bytes = user.faceEmbedding ?: continue
-                    val stored = byteArrayToFloatArray(bytes) ?: continue
-                    if (stored.size != feature.size) continue
-
-                    val sim = FaceSdk.calculateSimilarity(stored, feature)
+                for (cachedUser in cachedUsers) {
+                    if (cachedUser.feature.size != feature.size) continue
+                    val sim = FaceSdk.calculateSimilarity(cachedUser.feature, feature)
                     if (sim > bestSim) {
                         bestSim = sim
-                        bestUser = user
+                        bestUserId = cachedUser.id
+                        bestUserName = cachedUser.name
                     }
                 }
                 val compareMs = SystemClock.elapsedRealtime() - compareStart
+
                 maybeLogPerf(
                     totalMs = SystemClock.elapsedRealtime() - totalStart,
                     detectMs = detectMs,
                     featureMs = featureMs,
                     compareMs = compareMs,
-                    users = users.size,
+                    users = cachedUsers.size,
                     faces = faces.size,
                     bestSim = bestSim
                 )
 
                 val threshold = 0.70f
-                if (bestUser != null && bestSim >= threshold) {
+                if (bestUserId != null && bestSim >= threshold) {
                     FaceResult(
-                        userId = bestUser!!.id,
-                        userName = bestUser!!.name,
+                        userId = bestUserId,
+                        userName = bestUserName,
                         confidence = bestSim,
                         boundingBox = bbox,
                         isLive = true
@@ -174,18 +231,36 @@ class SeetaFaceEngine @Inject constructor(
     }
 
     override suspend fun registerUser(userId: Long, frames: List<Bitmap>): Boolean {
-        if (!isInitialized) return false
+        if (!isInitialized) {
+            Timber.w("[FaceEngine] 注册时引擎未初始化，尝试同步初始化")
+            startAsyncInit(appContext)
+            Thread.sleep(500)
+            if (!isInitialized) {
+                Timber.e("[FaceEngine] 注册失败：引擎初始化超时")
+                return false
+            }
+        }
 
         return withContext(Dispatchers.Default) {
             val userResult = userRepository.getUserById(userId)
-            val user = userResult.getOrNull() ?: return@withContext false
-            if (frames.isEmpty()) return@withContext false
+            val user = userResult.getOrNull() ?: run {
+                Timber.e("[FaceEngine] 注册失败：用户不存在 userId=$userId")
+                return@withContext false
+            }
+            if (frames.isEmpty()) {
+                Timber.e("[FaceEngine] 注册失败：没有传入图片")
+                return@withContext false
+            }
 
             var sum: FloatArray? = null
             var count = 0
 
             for (frame in frames) {
-                val feature = FaceSdk.extractFeature(frame) ?: continue
+                val feature = FaceSdk.extractFeature(frame)
+                if (feature == null) {
+                    Timber.w("[FaceEngine] 特征提取失败，跳过当前帧")
+                    continue
+                }
                 if (sum == null) {
                     sum = FloatArray(feature.size)
                 }
@@ -197,7 +272,10 @@ class SeetaFaceEngine @Inject constructor(
                 count++
             }
 
-            if (sum == null || count == 0) return@withContext false
+            if (sum == null || count == 0) {
+                Timber.e("[FaceEngine] 注册失败：无法从图片中提取特征")
+                return@withContext false
+            }
 
             for (i in sum!!.indices) {
                 sum!![i] /= count.toFloat()
@@ -206,6 +284,10 @@ class SeetaFaceEngine @Inject constructor(
             val embeddingBytes = floatArrayToByteArray(sum!!)
             val updated = user.copy(faceEmbedding = embeddingBytes)
             userRepository.updateUser(updated)
+
+            userFeatureCache[userId] = CachedUser(userId, user.name, sum!!)
+            Timber.i("[FaceEngine] 用户特征注册成功: userId=$userId, name=${user.name}, frames=$count")
+
             true
         }
     }
@@ -214,6 +296,7 @@ class SeetaFaceEngine @Inject constructor(
         if (!isInitialized) return
         FaceSdk.release()
         isInitialized = false
+        userFeatureCache.clear()
     }
 
     private fun maybeLogPerf(

@@ -21,6 +21,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,9 +47,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.smartcheck.app.ui.theme.BrandGreen
+import com.smartcheck.app.utils.DeviceAuth
 import com.smartcheck.app.ui.theme.Dimens
 import com.smartcheck.app.viewmodel.SettingsViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +65,7 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onLogout: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val adminName by viewModel.adminName.collectAsState()
@@ -243,6 +249,32 @@ fun SettingsScreen(
                     }
                 }
 
+                // 重置授权按钮
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            DeviceAuth.clearActivation()
+                            CoroutineScope(Dispatchers.Main).launch {
+                                onLogout()
+                            }
+                        }
+                        .padding(vertical = Dimens.PaddingNormal),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "重置授权",
+                        fontSize = Dimens.TextSizeNormal,
+                        color = Color(0xFFDC2626)
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = Color(0xFFDC2626)
+                    )
+                }
+
                 SettingRow(
                     label = "管理员姓名",
                     value = if (adminName.isBlank()) "赵某某" else adminName,
@@ -250,7 +282,7 @@ fun SettingsScreen(
                 )
                 SettingRow(
                     label = "登录账号",
-                    value = if (account.isBlank()) "12345678901" else account,
+                    value = account,
                     onEdit = { openEdit("登录账号", account) { viewModel.setAccount(it) } }
                 )
                 SettingRow(

@@ -48,10 +48,26 @@ class EmployeeDetailViewModel @Inject constructor(
         if (userId != null) {
             viewModelScope.launch {
                 userRepository.getUserById(userId).fold(
-                    onSuccess = { _user.value = it },
+                    onSuccess = { user ->
+                        _user.value = user
+                        loadExistingImages(user)
+                    },
                     onFailure = { _user.value = null }
                 )
             }
+        }
+    }
+
+    private fun loadExistingImages(user: User) {
+        val facePath = user.faceImagePath
+        if (!facePath.isNullOrBlank()) {
+            val bitmap = FileUtil.loadBitmapFromInternal(appContext, facePath)
+            _faceBitmap.value = bitmap
+        }
+        val certPath = user.healthCertImagePath
+        if (!certPath.isNullOrBlank()) {
+            val bitmap = FileUtil.loadBitmapFromInternal(appContext, certPath)
+            _certBitmap.value = bitmap
         }
     }
 
@@ -72,18 +88,62 @@ class EmployeeDetailViewModel @Inject constructor(
             emitError("健康证日期范围不合法")
             return
         }
-        val updated = current.copy(
-            name = name.trim(),
-            employeeId = employeeId.trim(),
-            idCardNumber = idCardNumber.trim(),
-            healthCertImagePath = healthCertImagePath.trim(),
-            healthCertStartDate = healthCertStartDate,
-            healthCertEndDate = healthCertEndDate
-        )
-        viewModelScope.launch {
-            userRepository.updateUser(updated)
-            _user.value = updated
-            _events.tryEmit(UiEvent.Saved)
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                var faceEmbedding = current.faceEmbedding
+                var faceImagePath = current.faceImagePath
+
+                val newFaceBitmap = _faceBitmap.value
+                if (newFaceBitmap != null) {
+                    Timber.d("更新人脸照片")
+                    val prepared = prepareFaceBitmap(newFaceBitmap)
+                    val faces = synchronized(FaceSdk) { FaceSdk.detect(prepared) }
+                    if (faces.isEmpty()) {
+                        emitError("未检测到人脸，请重新拍摄")
+                        return@launch
+                    }
+                    val feature = synchronized(FaceSdk) { FaceSdk.extractFeature(prepared) }
+                        ?: throw IllegalStateException("人脸不清晰，请重新拍摄")
+                    faceEmbedding = floatArrayToByteArray(feature)
+
+                    val faceName = "face_emp_${System.currentTimeMillis()}.jpg"
+                    faceImagePath = FileUtil.saveBitmapToInternal(appContext, newFaceBitmap, faceName)
+
+                    if (prepared !== newFaceBitmap) {
+                        prepared.recycle()
+                    }
+                }
+
+                var certImagePath = healthCertImagePath
+                val newCertBitmap = _certBitmap.value
+                if (newCertBitmap != null) {
+                    Timber.d("更新健康证照片")
+                    val certName = "cert_emp_${System.currentTimeMillis()}.jpg"
+                    certImagePath = FileUtil.saveBitmapToInternal(appContext, newCertBitmap, certName)
+                }
+
+                val updated = current.copy(
+                    name = name.trim(),
+                    employeeId = employeeId.trim(),
+                    idCardNumber = idCardNumber.trim(),
+                    healthCertImagePath = certImagePath.trim(),
+                    healthCertStartDate = healthCertStartDate,
+                    healthCertEndDate = healthCertEndDate,
+                    faceEmbedding = faceEmbedding,
+                    faceImagePath = faceImagePath
+                )
+                userRepository.updateUser(updated)
+                _user.value = updated
+                _faceBitmap.value = null
+                _certBitmap.value = null
+                launch(Dispatchers.Main) {
+                    _events.tryEmit(UiEvent.Saved)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "更新员工失败")
+                emitError(e.message ?: "保存失败")
+            }
         }
     }
 

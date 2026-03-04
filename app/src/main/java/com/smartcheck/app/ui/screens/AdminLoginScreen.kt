@@ -14,17 +14,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.smartcheck.app.utils.DeviceAuth
 import com.smartcheck.app.viewmodel.AdminAuthViewModel
 import com.smartcheck.app.viewmodel.SettingsViewModel
 import com.smartcheck.app.ui.theme.BrandGreen
 import com.smartcheck.app.ui.theme.Dimens
-import androidx.compose.ui.text.font.FontWeight
 import com.smartcheck.app.data.repository.AdminAuthRepository
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +43,14 @@ fun AdminLoginScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var passwordVisible by remember { mutableStateOf(false) }
     var rememberPassword by remember { mutableStateOf(true) }
+    
+    // 激活相关
+    var showActivationDialog by remember { mutableStateOf(false) }
+    var serverUrl by remember { mutableStateOf("") }
+    var activationCode by remember { mutableStateOf("") }
+    var activationError by remember { mutableStateOf<String?>(null) }
+    var isActivating by remember { mutableStateOf(false) }
+    var activationSuccess by remember { mutableStateOf(false) }
 
     val storedAccount by viewModel.account.collectAsState()
     val loginTitle by settingsViewModel.loginTitle.collectAsState()
@@ -164,6 +176,14 @@ fun AdminLoginScreen(
                 },
                 isError = error != null
             )
+            if (activationSuccess) {
+                Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+                Text(
+                    text = "激活成功！",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = Dimens.TextSizeSmall
+                )
+            }
             if (error != null) {
                 Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
                 Text(
@@ -175,12 +195,11 @@ fun AdminLoginScreen(
             Spacer(modifier = Modifier.height(Dimens.PaddingLarge))
             Button(
                 onClick = {
-                    viewModel.login(account, password) { ok ->
-                        if (ok) {
-                            onLoginSuccess()
-                        } else {
-                            error = "账号或密码错误"
-                        }
+                    viewModel.login(account, password) { result ->
+                        result.fold(
+                            onSuccess = { onLoginSuccess() },
+                            onFailure = { error = it.message ?: "登录失败" }
+                        )
                     }
                 },
                 modifier = Modifier
@@ -208,6 +227,102 @@ fun AdminLoginScreen(
                     Text(text = "忘记密码？", fontSize = Dimens.TextSizeSmall, color = BrandGreen)
                 }
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            TextButton(onClick = { showActivationDialog = true }) {
+                Text(text = "激活设备", fontSize = Dimens.TextSizeSmall, color = BrandGreen)
+            }
+        }
+        
+        // 激活对话框
+        if (showActivationDialog) {
+            AlertDialog(
+                onDismissRequest = { showActivationDialog = false },
+                title = { Text("激活设备") },
+                text = {
+                    Column {
+                        if (activationSuccess) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "✓",
+                                        fontSize = 48.sp,
+                                        color = Color(0xFF4CAF50)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "激活成功！",
+                                        fontSize = Dimens.TextSizeTitle,
+                                        color = Color(0xFF4CAF50),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        } else {
+                            OutlinedTextField(
+                                value = serverUrl,
+                                onValueChange = { serverUrl = it },
+                                label = { Text("激活服务器地址") },
+                                placeholder = { Text("http://192.168.1.100:8080") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+                            OutlinedTextField(
+                                value = activationCode,
+                                onValueChange = { activationCode = it },
+                                label = { Text("激活码") },
+                                placeholder = { Text("请输入激活码") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (activationError != null) {
+                                Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+                                Text(
+                                    text = activationError ?: "",
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = Dimens.TextSizeSmall
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (!activationSuccess) {
+                        Button(
+                            onClick = {
+                                isActivating = true
+                                activationError = null
+                                DeviceAuth.setActivationServerUrl(serverUrl)
+                                GlobalScope.launch {
+                                    val result = DeviceAuth.activate(activationCode)
+                                    isActivating = false
+                                    result.fold(
+                                        onSuccess = {
+                                            activationSuccess = true
+                                            kotlinx.coroutines.delay(1500)
+                                            showActivationDialog = false
+                                            activationSuccess = false
+                                            error = null
+                                        },
+                                        onFailure = {
+                                            activationError = it.message ?: "激活失败"
+                                        }
+                                    )
+                                }
+                            },
+                            enabled = !isActivating && serverUrl.isNotBlank() && activationCode.isNotBlank()
+                        ) {
+                            Text(if (isActivating) "激活中..." else "确认")
+                        }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showActivationDialog = false }) {
+                        Text(if (activationSuccess) "完成" else "取消")
+                    }
+                }
+            )
         }
         }
     }

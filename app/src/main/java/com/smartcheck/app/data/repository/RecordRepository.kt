@@ -118,4 +118,17 @@ class RecordRepository @Inject constructor(
             Result.failure(AppError.UnknownError(e.message ?: "deleteAllRecords failed"))
         }
     }
+
+    // 同步方法，用于 API 接口
+    suspend fun getRecordsByTimeRangeSync(startTime: Long, endTime: Long): List<RecordEntity> {
+        return recordDao.getRecordsByTimeRangeSync(startTime, endTime)
+    }
+
+    suspend fun getRecordByIdSync(id: Long): RecordEntity? {
+        return recordDao.getRecordById(id)
+    }
+
+    suspend fun getRecordsAfterId(lastId: Long, limit: Int): List<RecordEntity> {
+        return recordDao.getRecordsAfterId(lastId, limit)
+    }
 }

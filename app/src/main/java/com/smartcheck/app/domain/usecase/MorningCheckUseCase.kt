@@ -261,20 +261,43 @@ class MorningCheckUseCase @Inject constructor(
         val healthCertEndDate = user?.healthCertEndDate
         val remainingDays = healthCertEndDate?.let { user.getHealthCertDaysRemaining() }?.toInt()
 
-        if (remainingDays != null && remainingDays < 7) {
+        val healthCertStatus = when {
+            remainingDays == null -> HealthCertStatus.VALID
+            remainingDays < 0 -> HealthCertStatus.EXPIRED
+            remainingDays < 7 -> HealthCertStatus.EXPIRING_SOON
+            else -> HealthCertStatus.VALID
+        }
+
+        val isAllowedToContinue = healthCertStatus != HealthCertStatus.EXPIRED
+
+        if (!isAllowedToContinue) {
+            speakHealthCertExpired()
+        } else if (remainingDays != null && remainingDays < 7) {
             speakHealthCertWarning()
         }
 
-        speakSuccess(userName)
+        if (isAllowedToContinue) {
+            speakSuccess(userName)
+        }
 
         return FaceRecognizedResult(
             userId = userId,
             userName = userName,
             healthCertEndDate = healthCertEndDate,
             healthCertDaysRemaining = remainingDays,
+            healthCertStatus = healthCertStatus,
+            isAllowedToContinue = isAllowedToContinue,
             faceConfidence = confidence,
-            message = "欢迎，$userName"
+            message = when (healthCertStatus) {
+                HealthCertStatus.EXPIRED -> "健康证已过期，禁止上岗"
+                HealthCertStatus.EXPIRING_SOON -> "欢迎，$userName，健康证即将到期"
+                else -> "欢迎，$userName"
+            }
         )
+    }
+
+    fun speakHealthCertExpired() {
+        voiceService.speak("健康证已过期，禁止上岗")
     }
 
     fun speak(text: String) {
@@ -367,6 +390,8 @@ data class FaceRecognizedResult(
     val userName: String,
     val healthCertEndDate: Long?,
     val healthCertDaysRemaining: Int?,
+    val healthCertStatus: HealthCertStatus,
+    val isAllowedToContinue: Boolean,
     val faceConfidence: Float,
     val message: String
 )

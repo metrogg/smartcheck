@@ -3,7 +3,10 @@ package com.smartcheck.app.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.smartcheck.app.domain.model.HandStatus
+import com.smartcheck.app.domain.model.HealthCertStatus
 import com.smartcheck.app.domain.model.Record
+import com.smartcheck.app.domain.model.SymptomType
 import com.smartcheck.app.domain.repository.IRecordRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,13 +45,25 @@ class RecordDetailViewModel @Inject constructor(
         remark: String
     ) {
         val current = _record.value ?: return
+        
+        val isTempNormal = temperature < 37.3f
+        val isHandNormal = handStatus.equals("NORMAL", ignoreCase = true)
+        val isPassed = isTempNormal && isHandNormal
+        
+        val parsedHandStatus = try { HandStatus.valueOf(handStatus.uppercase()) } catch (e: Exception) { HandStatus.NOT_CHECKED }
+        val parsedHealthCertStatus = try { HealthCertStatus.valueOf(healthCertStatus.uppercase()) } catch (e: Exception) { HealthCertStatus.VALID }
+        val parsedSymptomFlags = symptomFlags.split(",").mapNotNull {
+            try { SymptomType.valueOf(it.trim().uppercase()) } catch (e: Exception) { null }
+        }
+        
         val updated = current.copy(
             temperature = temperature,
-            handStatus = com.smartcheck.app.domain.model.HandStatus.valueOf(handStatus),
-            healthCertStatus = com.smartcheck.app.domain.model.HealthCertStatus.valueOf(healthCertStatus),
-            symptomFlags = symptomFlags.split(",").mapNotNull {
-                try { com.smartcheck.app.domain.model.SymptomType.valueOf(it) } catch (e: Exception) { null }
-            },
+            isTempNormal = isTempNormal,
+            isHandNormal = isHandNormal,
+            isPassed = isPassed,
+            handStatus = parsedHandStatus,
+            healthCertStatus = parsedHealthCertStatus,
+            symptomFlags = parsedSymptomFlags,
             remark = remark
         )
         viewModelScope.launch {

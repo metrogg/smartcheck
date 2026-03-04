@@ -30,12 +30,15 @@ class AdminAuthViewModel @Inject constructor(
         }
     }
 
-    fun login(account: String, password: String, onResult: (Boolean) -> Unit) {
+    fun login(account: String, password: String, onResult: (Result<String>) -> Unit) {
         viewModelScope.launch {
             val result = adminAuthService.login(account, password)
             result.fold(
-                onSuccess = { onResult(true) },
-                onFailure = { onResult(false) }
+                onSuccess = { onResult(Result.success("登录成功")) },
+                onFailure = { 
+                    val errorMsg = it.message ?: "登录失败"
+                    onResult(Result.failure(Exception(errorMsg)))
+                }
             )
         }
     }

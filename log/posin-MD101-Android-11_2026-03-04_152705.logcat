@@ -1,0 +1,225 @@
+2026-03-04 15:36:41.905 10685-10685 HandDetector            com.smartcheck.app                   I  HandDetector initialized successfully
+2026-03-04 15:36:41.905 10685-10685 App                     com.smartcheck.app                   I  HandDetector initialized successfully
+2026-03-04 15:36:42.215 10685-10685 Choreographer           com.smartcheck.app                   I  Skipped 51 frames!  The application may be doing too much work on its main thread.
+2026-03-04 15:36:43.367 10685-10708 mali_so                 com.smartcheck.app                   I  [File] : hardware/rockchip/mali_so/driver/product/base/src/mali_base_kbase.c; [Line] : 1311; [Func] : base_context_deal_with_version_affairs_rk_ext;
+                                                                                                    arm_release_ver of this mali_so is 'g2p0-01eac0', rk_so_ver is '8@0 '.
+2026-03-04 15:36:43.367 10685-10708 mali_so                 com.smartcheck.app                   I  [File] : hardware/rockchip/mali_so/driver/product/base/src/mali_base_kbase.c; [Line] : 1327; [Func] : base_context_deal_with_version_affairs_rk_ext;
+                                                                                                    arm_release_vers are match. to set the full mali_ver 'g2p0-01eac0-x-8@0' as value of 'sys.gmali.version'.
+2026-03-04 15:36:43.363 10685-10685 RenderThread            com.smartcheck.app                   I  type=1400 audit(0.0:129618): avc: denied { write } for name="property_service" dev="tmpfs" ino=11085 scontext=u:r:untrusted_app:s0:c129,c256,c512,c768 tcontext=u:object_r:property_socket:s0 tclass=sock_file permissive=1 app=com.smartcheck.app
+2026-03-04 15:36:44.488 10685-10685 .smartcheck.ap          com.smartcheck.app                   W  Accessing hidden method Landroid/graphics/Canvas;->drawPatch(Landroid/graphics/NinePatch;Landroid/graphics/Rect;Landroid/graphics/Paint;)V (greylist-max-o, linking, denied)
+2026-03-04 15:36:44.488 10685-10685 .smartcheck.ap          com.smartcheck.app                   W  Accessing hidden method Landroid/graphics/Canvas;->drawPatch(Landroid/graphics/NinePatch;Landroid/graphics/RectF;Landroid/graphics/Paint;)V (greylist-max-o, linking, denied)
+2026-03-04 15:36:45.509 10685-10708 OpenGLRenderer          com.smartcheck.app                   I  Davey! duration=4168ms; Flags=1, IntendedVsync=165103238635856, Vsync=165104103042608, OldestInputEvent=9223372036854775807, NewestInputEvent=0, HandleInputStart=165104114613121, AnimationStart=165104114628579, PerformTraversalsStart=165104115120038, DrawStart=165107176855012, SyncQueued=165107249368894, SyncStart=165107249766436, IssueDrawCommandsStart=165107249971478, SwapBuffers=165107383064824, FrameCompleted=165107407936994, DequeueBufferDuration=2486167, QueueBufferDuration=1339626, GpuCompleted=0, 
+2026-03-04 15:36:45.602 10685-10685 Choreographer           com.smartcheck.app                   I  Skipped 183 frames!  The application may be doing too much work on its main thread.
+2026-03-04 15:36:45.845 10685-10708 OpenGLRenderer          com.smartcheck.app                   I  Davey! duration=3355ms; Flags=0, IntendedVsync=165104388251114, Vsync=165107489945930, OldestInputEvent=9223372036854775807, NewestInputEvent=0, HandleInputStart=165107500972545, AnimationStart=165107500985378, PerformTraversalsStart=165107685652396, DrawStart=165107686274813, SyncQueued=165107734499568, SyncStart=165107734888943, IssueDrawCommandsStart=165107735049360, SwapBuffers=165107742408110, FrameCompleted=165107743826194, DequeueBufferDuration=2031167, QueueBufferDuration=580125, GpuCompleted=28429470871191657, 
+2026-03-04 15:36:45.867 10685-10685 App                     com.smartcheck.app                   I  Ktor server auto-started on app launch
+2026-03-04 15:36:45.894 10685-10725 System.err              com.smartcheck.app                   W  SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+2026-03-04 15:36:45.894 10685-10725 System.err              com.smartcheck.app                   W  SLF4J: Defaulting to no-operation (NOP) logger implementation
+2026-03-04 15:36:45.894 10685-10725 System.err              com.smartcheck.app                   W  SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+2026-03-04 15:36:46.812 10685-10725 .smartcheck.ap          com.smartcheck.app                   W  Accessing hidden method Lsun/misc/VM;->maxDirectMemory()J (greylist, reflection, allowed)
+2026-03-04 15:36:46.817 10685-10725 PlatformDependent       com.smartcheck.app                   I  Your platform does not provide complete low-level API for accessing direct buffers reliably. Unless explicitly requested, heap buffer will always be preferred to avoid potential system instability.
+2026-03-04 15:36:46.823 10685-10725 .smartcheck.ap          com.smartcheck.app                   E  No implementation found for int io.netty.channel.kqueue.Native.sizeofKEvent() (tried Java_io_netty_channel_kqueue_Native_sizeofKEvent and Java_io_netty_channel_kqueue_Native_sizeofKEvent__)
+2026-03-04 15:36:46.834 10685-10725 .smartcheck.ap          com.smartcheck.app                   E  No implementation found for int io.netty.channel.epoll.Native.offsetofEpollData() (tried Java_io_netty_channel_epoll_Native_offsetofEpollData and Java_io_netty_channel_epoll_Native_offsetofEpollData__)
+2026-03-04 15:36:46.933 10685-10725 .smartcheck.ap          com.smartcheck.app                   W  Accessing hidden field Lsun/nio/ch/SelectorImpl;->selectedKeys:Ljava/util/Set; (greylist, reflection, allowed)
+2026-03-04 15:36:46.933 10685-10725 .smartcheck.ap          com.smartcheck.app                   W  Accessing hidden field Lsun/nio/ch/SelectorImpl;->publicSelectedKeys:Ljava/util/Set; (greylist, reflection, allowed)
+2026-03-04 15:36:46.993 10685-10685 DefaultDispatch         com.smartcheck.app                   I  type=1400 audit(0.0:129625): avc: denied { read } for name="somaxconn" dev="proc" ino=5379748 scontext=u:r:untrusted_app:s0:c129,c256,c512,c768 tcontext=u:object_r:proc_net:s0 tclass=file permissive=1 app=com.smartcheck.app
+2026-03-04 15:36:47.011 10685-10725 MacAddressUtil          com.smartcheck.app                   W  Failed to find a usable hardware address from the network interfaces; using random bytes: 2a:44:6c:c2:68:49:dc:eb
+2026-03-04 15:36:47.109 10685-10725 KtorServerManager$start com.smartcheck.app                   I  Ktor server started on port 8080
+2026-03-04 15:36:47.488 10685-10729 ProfileInstaller        com.smartcheck.app                   D  Installing profile for com.smartcheck.app
+2026-03-04 15:36:58.005 10685-10685 TetheringManager        com.smartcheck.app                   I  registerTetheringEventCallback:com.smartcheck.app
+2026-03-04 15:36:58.047 10685-10698 .smartcheck.ap          com.smartcheck.app                   I  Compiler allocated 7365KB to compile void com.smartcheck.app.ui.screens.AdminLoginScreenKt.AdminLoginScreen(kotlin.jvm.functions.Function0, kotlin.jvm.functions.Function0, com.smartcheck.app.viewmodel.AdminAuthViewModel, com.smartcheck.app.viewmodel.SettingsViewModel, androidx.compose.runtime.Composer, int, int)
+2026-03-04 15:36:58.751 10685-10708 OpenGLRenderer          com.smartcheck.app                   I  Davey! duration=1011ms; Flags=0, IntendedVsync=165119637340385, Vsync=165119705136993, OldestInputEvent=9223372036854775807, NewestInputEvent=0, HandleInputStart=165119710932021, AnimationStart=165119710995313, PerformTraversalsStart=165120074406183, DrawStart=165120075477766, SyncQueued=165120644328157, SyncStart=165120644822532, IssueDrawCommandsStart=165120645206657, SwapBuffers=165120648161824, FrameCompleted=165120649479282, DequeueBufferDuration=281458, QueueBufferDuration=482125, GpuCompleted=7954869214574440047, 
+2026-03-04 15:36:58.771 10685-10685 Choreographer           com.smartcheck.app                   I  Skipped 37 frames!  The application may be doing too much work on its main thread.
+2026-03-04 15:36:58.868 10685-10708 OpenGLRenderer          com.smartcheck.app                   I  Davey! duration=740ms; Flags=0, IntendedVsync=165120026115447, Vsync=165120653234071, OldestInputEvent=9223372036854775807, NewestInputEvent=0, HandleInputStart=165120669952243, AnimationStart=165120669961284, PerformTraversalsStart=165120749938917, DrawStart=165120750842501, SyncQueued=165120762018002, SyncStart=165120762530752, IssueDrawCommandsStart=165120762808710, SwapBuffers=165120765670544, FrameCompleted=165120766873961, DequeueBufferDuration=361375, QueueBufferDuration=424667, GpuCompleted=7959372814201810543, 
+2026-03-04 15:36:59.944 10685-10685 AppModule               com.smartcheck.app                   D  Initializing FaceEngine (Seeta)
+2026-03-04 15:36:59.956 10685-10733 linker                  com.smartcheck.app                   W  Warning: "/data/app/~~Diu0SqUrhMjas5B0Rw4kUg==/com.smartcheck.app-gHORoXCkHYi1ANr974mVVg==/base.apk!/lib/arm64-v8a/libTenniS.so" unused DT entry: DT_RPATH (type 0xf arg 0x1fb4e) (ignoring)
+2026-03-04 15:36:59.979 10685-10685 MainViewModel           com.smartcheck.app                   D  MainViewModel initialized
+2026-03-04 15:36:59.980 10685-10685 HardwareRepository      com.smartcheck.app                   D  Initializing hardware...
+2026-03-04 15:36:59.981 10685-10685 SerialPortManager       com.smartcheck.app                   D  Opening serial port: /dev/ttyS1, baudRate: 9600
+2026-03-04 15:37:00.041 10685-10733 FaceSdk                 com.smartcheck.app                   D  Native libraries loaded successfully
+2026-03-04 15:37:00.081 10685-10735 CameraManagerGlobal     com.smartcheck.app                   I  Connecting to camera service
+2026-03-04 15:37:00.180 10685-10735 CameraRepository        com.smartcheck.app                   D  Added camera: 100
+2026-03-04 15:37:00.283 10685-10735 Camera2CameraInfo       com.smartcheck.app                   I  Device Level: INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL
+2026-03-04 15:37:00.330 10685-10735 CameraRepository        com.smartcheck.app                   D  Added camera: 102
+2026-03-04 15:37:00.334 10685-10735 Camera2CameraInfo       com.smartcheck.app                   I  Device Level: INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL
+2026-03-04 15:37:00.337 10685-10735 CameraValidator         com.smartcheck.app                   W  No lens facing info in the availableCamerasSelector, don't verify the camera lens facing.
+2026-03-04 15:37:00.592 10685-10708 OpenGLRenderer          com.smartcheck.app                   I  Davey! duration=858ms; Flags=0, IntendedVsync=165121631947464, Vsync=165121682794920, OldestInputEvent=9223372036854775807, NewestInputEvent=0, HandleInputStart=165121685387220, AnimationStart=165121685394803, PerformTraversalsStart=165122229015733, DrawStart=165122436314920, SyncQueued=165122484087883, SyncStart=165122484518675, IssueDrawCommandsStart=165122484921467, SwapBuffers=165122488653050, FrameCompleted=165122490395467, DequeueBufferDuration=437500, QueueBufferDuration=769417, GpuCompleted=42949941395464, 
+2026-03-04 15:37:00.780 10685-10733 FaceSdk                 com.smartcheck.app                   I  Model MD5 fd=C51F6A439E8A9A3749BD97E93364A71C lm=BB203AE6A607EE40D7850227E5FE4FC0 fr=785BB3208F928AD297718BD6B5DD0353 (not enforced)
+2026-03-04 15:37:00.782 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit fd model size=4054932 path=/data/user/0/com.smartcheck.app/files/face_detector.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit probe(fd) ok size=4054932 path=/data/user/0/com.smartcheck.app/files/face_detector.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit ifstream(fd) ok size=4054932 path=/data/user/0/com.smartcheck.app/files/face_detector.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit lm model size=421988 path=/data/user/0/com.smartcheck.app/files/face_landmarker_pts5.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit probe(lm) ok size=421988 path=/data/user/0/com.smartcheck.app/files/face_landmarker_pts5.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit ifstream(lm) ok size=421988 path=/data/user/0/com.smartcheck.app/files/face_landmarker_pts5.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit fr model size=102551956 path=/data/user/0/com.smartcheck.app/files/face_recognizer.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit probe(fr) ok size=102551956 path=/data/user/0/com.smartcheck.app/files/face_recognizer.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit ifstream(fr) ok size=102551956 path=/data/user/0/com.smartcheck.app/files/face_recognizer.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit fas1 model size=44729700 path=/data/user/0/com.smartcheck.app/files/fas_first.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit probe(fas1) ok size=44729700 path=/data/user/0/com.smartcheck.app/files/fas_first.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit ifstream(fas1) ok size=44729700 path=/data/user/0/com.smartcheck.app/files/fas_first.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit fas2 model size=19102340 path=/data/user/0/com.smartcheck.app/files/fas_second.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit probe(fas2) ok size=19102340 path=/data/user/0/com.smartcheck.app/files/fas_second.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit ifstream(fas2) ok size=19102340 path=/data/user/0/com.smartcheck.app/files/fas_second.csta
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit settings: fd(device=1 id=0 model0=/data/user/0/com.smartcheck.app/files/face_detector.csta) lm(device=1 id=0 model0=/data/user/0/com.smartcheck.app/files/face_landmarker_pts5.csta) fr(device=1 id=0 model0=/data/user/0/com.smartcheck.app/files/face_recognizer.csta)
+2026-03-04 15:37:00.783 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit creating FaceDetector... core=auto sizeof(SeetaModelSetting)=16
+2026-03-04 15:37:00.864 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:00.890 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:00.899 10685-10685 CameraOrientationUtil   com.smartcheck.app                   D  getRelativeImageRotation: destRotationDegrees=0, sourceRotationDegrees=0, isOppositeFacing=false, result=0
+2026-03-04 15:37:00.924 10685-10685 chatty                  com.smartcheck.app                   I  uid=10129(com.smartcheck.app) identical 2 lines
+2026-03-04 15:37:00.925 10685-10685 CameraOrientationUtil   com.smartcheck.app                   D  getRelativeImageRotation: destRotationDegrees=0, sourceRotationDegrees=0, isOppositeFacing=false, result=0
+2026-03-04 15:37:00.930 10685-10685 DynamicRangeResolver    com.smartcheck.app                   D  Resolved dynamic range for use case androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02 to no compatible HDR dynamic ranges.
+                                                                                                    DynamicRange@bb31a12{encoding=UNSPECIFIED, bitDepth=0}
+                                                                                                    ->
+                                                                                                    DynamicRange@611759d{encoding=SDR, bitDepth=8}
+2026-03-04 15:37:00.945 10685-10685 CameraOrientationUtil   com.smartcheck.app                   D  getRelativeImageRotation: destRotationDegrees=0, sourceRotationDegrees=0, isOppositeFacing=false, result=0
+2026-03-04 15:37:00.948 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:00.949 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:00.953 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit FaceDetector ok
+2026-03-04 15:37:00.953 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit creating FaceLandmarker...
+2026-03-04 15:37:00.959 10685-10685 CameraOrientationUtil   com.smartcheck.app                   D  getRelativeImageRotation: destRotationDegrees=0, sourceRotationDegrees=0, isOppositeFacing=false, result=0
+2026-03-04 15:37:00.964 10685-10685 DeferrableSurface       com.smartcheck.app                   D  Surface created[total_surfaces=1, used_surfaces=0](androidx.camera.core.processing.SurfaceEdge$SettableSurface@91fc5e3}
+2026-03-04 15:37:00.969 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:00.973 10685-10685 DeferrableSurface       com.smartcheck.app                   D  Surface created[total_surfaces=2, used_surfaces=0](androidx.camera.core.SurfaceRequest$2@1fedd3f}
+2026-03-04 15:37:00.975 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:00.976 10685-10685 DeferrableSurface       com.smartcheck.app                   D  New surface in use[total_surfaces=2, used_surfaces=1](androidx.camera.core.SurfaceRequest$2@1fedd3f}
+2026-03-04 15:37:00.977 10685-10685 DeferrableSurface       com.smartcheck.app                   D  use count+1, useCount=1 androidx.camera.core.SurfaceRequest$2@1fedd3f
+2026-03-04 15:37:00.980 10685-10685 CameraOrientationUtil   com.smartcheck.app                   D  getRelativeImageRotation: destRotationDegrees=0, sourceRotationDegrees=0, isOppositeFacing=false, result=0
+2026-03-04 15:37:00.991 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:00.992 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:00.993 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit FaceLandmarker ok
+2026-03-04 15:37:00.993 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit creating FaceRecognizer...
+2026-03-04 15:37:00.998 10685-10685 CameraOrientationUtil   com.smartcheck.app                   D  getRelativeImageRotation: destRotationDegrees=0, sourceRotationDegrees=0, isOppositeFacing=false, result=0
+2026-03-04 15:37:01.002 10685-10685 CameraOrientationUtil   com.smartcheck.app                   D  getRelativeImageRotation: destRotationDegrees=0, sourceRotationDegrees=0, isOppositeFacing=false, result=0
+2026-03-04 15:37:01.006 10685-10685 DeferrableSurface       com.smartcheck.app                   D  Surface created[total_surfaces=3, used_surfaces=1](androidx.camera.core.impl.ImmediateSurface@f3e06f8}
+2026-03-04 15:37:01.013 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Use case androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155 ACTIVE
+2026-03-04 15:37:01.017 10685-10685 DualCamera...eraPreview com.smartcheck.app                   D  Selected camera: type=FACE id=100 lensFacing=2
+2026-03-04 15:37:01.022 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  Active and attached use case: [] for camera: 100
+2026-03-04 15:37:01.034 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Use case androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504 ACTIVE
+2026-03-04 15:37:01.034 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  Active and attached use case: [] for camera: 100
+2026-03-04 15:37:01.042 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Use cases [androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155, androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504] now ATTACHED
+2026-03-04 15:37:01.044 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  All use case: [androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155, androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504] for camera: 100
+2026-03-04 15:37:01.054 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  Active and attached use case: [androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155, androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504] for camera: 100
+2026-03-04 15:37:01.070 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Resetting Capture Session
+2026-03-04 15:37:01.075 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Releasing session in state INITIALIZED
+2026-03-04 15:37:01.077 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Attempting to force open the camera.
+2026-03-04 15:37:01.079 10685-10735 CameraStateRegistry     com.smartcheck.app                   D  tryOpenCamera(Camera@8fcc907[id=100]) [Available Cameras: 1, Already Open: false (Previous state: null)] --> SUCCESS
+2026-03-04 15:37:01.081 10685-10735 CameraStateRegistry     com.smartcheck.app                   D  Recalculating open cameras:
+                                                                                                    Camera                                       State                 
+                                                                                                    -------------------------------------------------------------------
+                                                                                                    Camera@cdbd1ff[id=102]                       UNKNOWN               
+                                                                                                    Camera@8fcc907[id=100]                       OPENING               
+                                                                                                    -------------------------------------------------------------------
+                                                                                                    Open count: 1 (Max allowed: 1)
+2026-03-04 15:37:01.083 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Opening camera.
+2026-03-04 15:37:01.084 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Transitioning camera internal state: INITIALIZED --> OPENING
+2026-03-04 15:37:01.085 10685-10735 CameraStateMachine      com.smartcheck.app                   D  New public camera state CameraState{type=OPENING, error=null} from OPENING and null
+2026-03-04 15:37:01.086 10685-10735 CameraStateMachine      com.smartcheck.app                   D  Publishing new public camera state CameraState{type=OPENING, error=null}
+2026-03-04 15:37:01.088 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  All use case: [androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155, androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504] for camera: 100
+2026-03-04 15:37:01.200 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Use case androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155 ACTIVE
+2026-03-04 15:37:01.207 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  Active and attached use case: [androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155, androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504] for camera: 100
+2026-03-04 15:37:01.231 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Use case androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504 ACTIVE
+2026-03-04 15:37:01.233 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  Active and attached use case: [androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155, androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504] for camera: 100
+2026-03-04 15:37:01.235 10685-10685 PreviewView             com.smartcheck.app                   D  Surface requested by Preview.
+2026-03-04 15:37:01.242 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 21215(1019KB) AllocSpace objects, 1(84KB) LOS objects, 49% free, 7084KB/13MB, paused 487us total 247.101ms
+2026-03-04 15:37:01.245 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} CameraDevice.onOpened()
+2026-03-04 15:37:01.247 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Transitioning camera internal state: OPENING --> OPENED
+2026-03-04 15:37:01.256 10685-10735 CameraStateRegistry     com.smartcheck.app                   D  Recalculating open cameras:
+                                                                                                    Camera                                       State                 
+                                                                                                    -------------------------------------------------------------------
+                                                                                                    Camera@cdbd1ff[id=102]                       UNKNOWN               
+                                                                                                    Camera@8fcc907[id=100]                       OPEN                  
+                                                                                                    -------------------------------------------------------------------
+                                                                                                    Open count: 1 (Max allowed: 1)
+2026-03-04 15:37:01.257 10685-10735 CameraStateMachine      com.smartcheck.app                   D  New public camera state CameraState{type=OPEN, error=null} from OPEN and null
+2026-03-04 15:37:01.258 10685-10735 CameraStateMachine      com.smartcheck.app                   D  Publishing new public camera state CameraState{type=OPEN, error=null}
+2026-03-04 15:37:01.264 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  All use case: [androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155, androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504] for camera: 100
+2026-03-04 15:37:01.289 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  Active and attached use case: [androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155, androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504] for camera: 100
+2026-03-04 15:37:01.320 10685-10685 TextureViewImpl         com.smartcheck.app                   D  SurfaceTexture available. Size: 1280x720
+2026-03-04 15:37:01.321 10685-10685 TextureViewImpl         com.smartcheck.app                   D  Surface set on Preview.
+2026-03-04 15:37:01.324 10685-10736 SyncCaptureSessionBase  com.smartcheck.app                   D  [androidx.camera.camera2.internal.SynchronizedCaptureSessionBaseImpl@e288ed] getSurface...done
+2026-03-04 15:37:01.325 10685-10736 CaptureSession          com.smartcheck.app                   D  Opening capture session.
+2026-03-04 15:37:01.335 10685-10685 PreviewView             com.smartcheck.app                   D  Preview transformation info updated. TransformationInfo{getCropRect=Rect(0, 0 - 1280, 720), getRotationDegrees=0, getTargetRotation=0, hasCameraTransform=true, getSensorToBufferTransform=Matrix{[0.6666667, 0.0, -0.0][0.0, 0.6666667, -0.0][0.0, 0.0, 1.0]}, getMirroring=false}
+2026-03-04 15:37:01.336 10685-10685 PreviewTransform        com.smartcheck.app                   D  Transformation info set: TransformationInfo{getCropRect=Rect(0, 0 - 1280, 720), getRotationDegrees=0, getTargetRotation=0, hasCameraTransform=true, getSensorToBufferTransform=Matrix{[0.6666667, 0.0, -0.0][0.0, 0.6666667, -0.0][0.0, 0.0, 1.0]}, getMirroring=false} 1280x720 false
+2026-03-04 15:37:01.367 10685-10736 DeferrableSurface       com.smartcheck.app                   D  use count+1, useCount=2 androidx.camera.core.SurfaceRequest$2@1fedd3f
+2026-03-04 15:37:01.368 10685-10736 DeferrableSurface       com.smartcheck.app                   D  New surface in use[total_surfaces=3, used_surfaces=2](androidx.camera.core.impl.ImmediateSurface@f3e06f8}
+2026-03-04 15:37:01.368 10685-10736 DeferrableSurface       com.smartcheck.app                   D  use count+1, useCount=1 androidx.camera.core.impl.ImmediateSurface@f3e06f8
+2026-03-04 15:37:01.772 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:01.877 10685-10736 CaptureSession          com.smartcheck.app                   D  Attempting to send capture request onConfigured
+2026-03-04 15:37:01.877 10685-10736 CaptureSession          com.smartcheck.app                   D  Issuing request for session.
+2026-03-04 15:37:01.878 10685-10736 Camera2Cap...estBuilder com.smartcheck.app                   D  createCaptureRequest
+2026-03-04 15:37:01.888 10685-10736 CaptureSession          com.smartcheck.app                   D  CameraCaptureSession.onConfigured() mState=OPENED
+2026-03-04 15:37:01.890 10685-10736 CaptureSession          com.smartcheck.app                   D  CameraCaptureSession.onReady() OPENED
+2026-03-04 15:37:01.915 10685-10747 ion                     com.smartcheck.app                   E  ioctl c0044901 failed with code -1: Inappropriate ioctl for device
+2026-03-04 15:37:01.952 10685-10685 StreamStateObserver     com.smartcheck.app                   D  Update Preview stream state to STREAMING
+2026-03-04 15:37:02.183 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:02.213 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 16122(829KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6783KB/13MB, paused 231us total 206.088ms
+2026-03-04 15:37:02.227 10685-10725 FaceSdk                 com.smartcheck.app                   W  FaceSdk not initialized
+2026-03-04 15:37:02.508 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:02.508 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:02.582 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit FaceRecognizer ok
+2026-03-04 15:37:02.582 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit creating FaceAntiSpoofing with two models...
+2026-03-04 15:37:02.589 10685-10725 FaceSdk                 com.smartcheck.app                   W  FaceSdk not initialized
+2026-03-04 15:37:02.669 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 2104(162KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6797KB/13MB, paused 7.728ms total 220.396ms
+2026-03-04 15:37:02.740 10685-10725 FaceSdk                 com.smartcheck.app                   W  FaceSdk not initialized
+2026-03-04 15:37:02.946 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:02.984 10685-10725 FaceSdk                 com.smartcheck.app                   W  FaceSdk not initialized
+2026-03-04 15:37:03.012 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:03.107 10685-10733 chatty                  com.smartcheck.app                   I  uid=10129(com.smartcheck.app) Thread-5 identical 1 line
+2026-03-04 15:37:03.107 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:03.177 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 3457(222KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6799KB/13MB, paused 177us total 220.587ms
+2026-03-04 15:37:03.209 10685-10725 FaceSdk                 com.smartcheck.app                   W  FaceSdk not initialized
+2026-03-04 15:37:03.396 10685-10725 FaceSdk                 com.smartcheck.app                   W  FaceSdk not initialized
+2026-03-04 15:37:03.453 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:03.503 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:03.611 10685-10725 FaceSdk                 com.smartcheck.app                   W  FaceSdk not initialized
+2026-03-04 15:37:03.841 10685-10725 FaceSdk                 com.smartcheck.app                   W  FaceSdk not initialized
+2026-03-04 15:37:03.913 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 5130(249KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6790KB/13MB, paused 737us total 143.500ms
+2026-03-04 15:37:04.001 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:04.002 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:04.015 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit FaceAntiSpoofing ok
+2026-03-04 15:37:04.015 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit creating FaceTracker...
+2026-03-04 15:37:04.048 10685-10725 FaceSdk                 com.smartcheck.app                   W  FaceSdk not initialized
+2026-03-04 15:37:04.087 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:04.160 10685-10733 chatty                  com.smartcheck.app                   I  uid=10129(com.smartcheck.app) Thread-5 identical 2 lines
+2026-03-04 15:37:04.160 10685-10733 TensorStack             com.smartcheck.app                   I  
+2026-03-04 15:37:04.169 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit FaceTracker ok
+2026-03-04 15:37:04.169 10685-10733 FaceSdkJNI              com.smartcheck.app                   I  nativeInit ok. fd=/data/user/0/com.smartcheck.app/files/face_detector.csta lm=/data/user/0/com.smartcheck.app/files/face_landmarker_pts5.csta fr=/data/user/0/com.smartcheck.app/files/face_recognizer.csta landmarks=5
+2026-03-04 15:37:04.169 10685-10733 FaceSdk                 com.smartcheck.app                   I  FaceSdk initialized successfully
+2026-03-04 15:37:04.171 10685-10733 SeetaFaceEngine         com.smartcheck.app                   I  SeetaFaceEngine init ok (async) time=4222ms
+2026-03-04 15:37:04.703 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 5286(273KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6806KB/13MB, paused 107us total 175.754ms
+2026-03-04 15:37:04.766 10685-10725 FaceSdkJNI              com.smartcheck.app                   I  nativeTrack detected 1 tracked faces
+2026-03-04 15:37:05.435 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 5417(322KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6820KB/13MB, paused 127us total 177.286ms
+2026-03-04 15:37:05.532 10685-10725 FaceSdkJNI              com.smartcheck.app                   I  nativeTrack detected 1 tracked faces
+2026-03-04 15:37:05.631 10685-10685 MainViewMo...ameraFrame com.smartcheck.app                   D  [人脸跟踪] 跟踪ID=0, 稳定帧数=2/3
+2026-03-04 15:37:06.363 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 6688(330KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6826KB/13MB, paused 145us total 137.545ms
+2026-03-04 15:37:06.472 10685-10725 FaceSdkJNI              com.smartcheck.app                   I  nativeTrack detected 1 tracked faces
+2026-03-04 15:37:06.569 10685-10685 MainViewMo...ameraFrame com.smartcheck.app                   D  [人脸跟踪] 跟踪ID=0, 稳定帧数=3/3
+2026-03-04 15:37:07.192 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 5966(308KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6839KB/13MB, paused 93us total 142.484ms
+2026-03-04 15:37:07.959 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 4899(276KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6819KB/13MB, paused 195us total 213.781ms
+2026-03-04 15:37:08.629 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 4937(238KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6821KB/13MB, paused 141us total 145.271ms
+2026-03-04 15:37:09.802 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 8657(465KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6905KB/13MB, paused 198us total 183.744ms
+2026-03-04 15:37:10.714 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 6585(303KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6874KB/13MB, paused 112us total 193.893ms
+2026-03-04 15:37:11.292 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 3939(199KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 6867KB/13MB, paused 129us total 145.842ms
+2026-03-04 15:37:11.643 10685-10725 FaceSdkJNI              com.smartcheck.app                   I  nativeDetectLiveness status=0 (0=REAL, 1=SPOOF, 2=FUZZY, 3=DETECTING)
+2026-03-04 15:37:11.744 10685-10725 SeetaFaceE...dRecognize com.smartcheck.app                   D  [人脸识别] 活体检测: isLive=true, status=REAL, 耗时=2685ms
+2026-03-04 15:37:11.747 10685-10725 SeetaFaceEngine         com.smartcheck.app                   D  Face perf total=5172ms detect=590ms feature=1764ms compare=2ms users=4 faces=1 bestSim=0.913
+2026-03-04 15:37:11.749 10685-10685 MainViewModel           com.smartcheck.app                   D  Face recognized: 东东 (confidence: 0.9126018)
+2026-03-04 15:37:11.760 10685-10685 SerialPortManager       com.smartcheck.app                   D  Beep: 200ms
+2026-03-04 15:37:11.776 10685-10685 Perf                    com.smartcheck.app                   D  face_recognition: 25ms (avg: 25ms)
+2026-03-04 15:37:11.779 10685-10685 Action                  com.smartcheck.app                   D  FACE_RECOGNIZED on MainScreen: userId=8, name=东东 [SUCCESS]
+2026-03-04 15:37:12.567 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 18166(825KB) AllocSpace objects, 5(100KB) LOS objects, 49% free, 6976KB/13MB, paused 235us total 128.192ms
+2026-03-04 15:37:12.763 10685-10685 MainViewModel           com.smartcheck.app                   D  Starting temperature measurement
+2026-03-04 15:37:14.136 10685-10699 .smartcheck.ap          com.smartcheck.app                   I  NativeAlloc concurrent copying GC freed 10600(456KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 7049KB/13MB, paused 266us total 134.281ms
+2026-03-04 15:37:14.773 10685-10685 MainViewModel           com.smartcheck.app                   D  Temperature normal: 36.64956
+2026-03-04 15:37:14.774 10685-10685 SerialPortManager       com.smartcheck.app                   D  Beep: 200ms
+2026-03-04 15:37:14.831 10685-10685 CameraOrientationUtil   com.smartcheck.app                   D  getRelativeImageRotation: destRotationDegrees=0, sourceRotationDegrees=0, isOppositeFacing=false, result=0
+2026-03-04 15:37:14.832 10685-10685 DeferrableSurface       com.smartcheck.app                   D  surface closed,  useCount=2 closed=true androidx.camera.core.SurfaceRequest$2@1fedd3f
+2026-03-04 15:37:14.832 10685-10685 DeferrableSurface       com.smartcheck.app                   D  surface closed,  useCount=0 closed=true androidx.camera.core.processing.SurfaceEdge$SettableSurface@91fc5e3
+2026-03-04 15:37:14.833 10685-10685 DeferrableSurface       com.smartcheck.app                   D  Surface terminated[total_surfaces=2, used_surfaces=2](androidx.camera.core.processing.SurfaceEdge$SettableSurface@91fc5e3}
+2026-03-04 15:37:14.833 10685-10685 DeferrableSurface       com.smartcheck.app                   D  use count-1,  useCount=1 closed=true androidx.camera.core.SurfaceRequest$2@1fedd3f
+2026-03-04 15:37:14.834 10685-10685 DeferrableSurface       com.smartcheck.app                   D  surface closed,  useCount=1 closed=true androidx.camera.core.impl.ImmediateSurface@f3e06f8
+2026-03-04 15:37:14.836 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Use cases [androidx.camera.core.Preview-811e7fd2-9e7d-4a9c-8f20-a4742c472a02160642155, androidx.camera.core.ImageAnalysis-2994f0b3-2079-4511-9d11-54fd6ed37c1f57154504] now DETACHED for camera
+2026-03-04 15:37:14.837 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  All use case: [] for camera: 100
+2026-03-04 15:37:14.838 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Resetting Capture Session
+2026-03-04 15:37:14.842 10685-10735 Camera2CameraImpl       com.smartcheck.app                   D  {Camera@8fcc907[id=100]} Releasing session in state OPENED
+2026-03-04 15:37:14.842 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  Active and attached use case: [] for camera: 100
+2026-03-04 15:37:14.844 10685-10735 UseCaseAttachState      com.smartcheck.app                   D  Active and attached use case: [] for camera: 100

@@ -62,6 +62,7 @@ target_link_libraries(face_sdk
     SeetaFaceDetector
     SeetaFaceLandmarker
     SeetaFaceRecognizer
+    SeetaFaceAntiSpoofing
     SeetaFaceTracking
     SeetaQualityAssessor
     TenniS
