@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartcheck.app.domain.model.User
 import com.smartcheck.app.domain.repository.IUserRepository
+import com.smartcheck.app.ml.FaceEngine
 import com.smartcheck.app.utils.FileUtil
 import com.smartcheck.sdk.face.FaceSdk
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,6 +28,7 @@ import javax.inject.Inject
 class EmployeeDetailViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val userRepository: IUserRepository,
+    private val faceEngine: FaceEngine,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -135,6 +137,12 @@ class EmployeeDetailViewModel @Inject constructor(
                 )
                 userRepository.updateUser(updated)
                 _user.value = updated
+
+                if (faceEmbedding != null) {
+                    Timber.d("人脸已更新，刷新缓存")
+                    faceEngine.refreshUserCache()
+                }
+
                 _faceBitmap.value = null
                 _certBitmap.value = null
                 launch(Dispatchers.Main) {

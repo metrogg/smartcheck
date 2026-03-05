@@ -6,7 +6,6 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.interfaces.DecodedJWT
 import java.util.Date
-import java.util.UUID
 
 /**
  * JWT 工具类
@@ -29,7 +28,7 @@ object JwtUtil {
         val expiry = Date(now.time + EXPIRATION_TIME)
         
         return JWT.create()
-            .withJWTId(UUID.randomUUID().toString())
+            .withSubject(userId.toString())  // 使用 userId 作为 subject
             .withClaim("userId", userId)
             .withClaim("username", username)
             .withIssuedAt(now)
@@ -54,7 +53,7 @@ object JwtUtil {
      * 从 Token 中提取用户ID
      */
     fun getUserId(decodedJWT: DecodedJWT): Long {
-        return decodedJWT.getClaim("userId").asLong()
+        return decodedJWT.getSubject()?.toLongOrNull() ?: decodedJWT.getClaim("userId").asLong()
     }
 
     /**

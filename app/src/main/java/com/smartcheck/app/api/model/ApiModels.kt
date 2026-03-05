@@ -53,6 +53,24 @@ data class UserInfo(
 )
 
 /**
+ * 健康检查响应
+ */
+@Serializable
+data class HealthStatusResponse(
+    val status: String,
+    val timestamp: Long
+)
+
+/**
+ * 错误响应
+ */
+@Serializable
+data class ErrorResponse(
+    val code: Int,
+    val message: String
+)
+
+/**
  * 分页响应
  */
 @Serializable
@@ -194,8 +212,35 @@ data class UserSyncDetail(
 )
 
 /**
- * 错误码
+ * 员工信息响应
  */
+@Serializable
+data class EmployeeResponse(
+    val id: Long,
+    val name: String,
+    val employeeId: String,
+    val idCardNumber: String,
+    val healthCertStatus: String,
+    val healthCertStartDate: Long? = null,
+    val healthCertEndDate: Long? = null,
+    val faceImage: String? = null,
+    val healthCertImage: String? = null,
+    val isActive: Boolean,
+    val createdAt: Long
+)
+
+/**
+ * 导出请求
+ */
+@Serializable
+data class ExportRequest(
+    val startDate: String,
+    val endDate: String,
+    val format: String = "csv",
+    val employeeId: String? = null
+)
+
+
 object ErrorCodes {
     const val SUCCESS = 0
     const val UNAUTHORIZED = 1001

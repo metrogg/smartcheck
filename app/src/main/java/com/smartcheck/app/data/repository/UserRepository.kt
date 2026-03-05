@@ -48,6 +48,14 @@ class UserRepository @Inject constructor(
         }
     }
 
+    override suspend fun getUsersAfterId(lastId: Long, limit: Int): List<User> {
+        return try {
+            userDao.getUsersAfterId(lastId, limit).map { it.toDomain() }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     override suspend fun getUserByFaceFeature(embedding: ByteArray): Result<User> {
         return Result.failure(AppError.NoTargetDetected)
     }

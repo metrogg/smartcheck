@@ -5,6 +5,8 @@ import com.smartcheck.app.api.model.*
 import com.smartcheck.app.data.db.*
 import com.smartcheck.app.data.repository.AdminAuthRepository
 import com.smartcheck.app.data.repository.RecordRepository
+import com.smartcheck.app.data.repository.UserRepository
+import com.smartcheck.app.domain.model.User
 import com.smartcheck.app.utils.FileUtil
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.http.*
@@ -16,6 +18,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import timber.log.Timber
@@ -34,6 +37,7 @@ class ApiService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val adminAuthRepository: AdminAuthRepository,
     private val recordRepository: RecordRepository,
+    private val userRepository: UserRepository,
     private val apiTokenDao: ApiTokenDao,
     private val apiAccessLogDao: ApiAccessLogDao,
     private val systemUserDao: SystemUserDao
@@ -48,7 +52,7 @@ class ApiService @Inject constructor(
         routing {
             // 健康检查（无需认证）
             get("/health") {
-                call.respond(ApiResponse.success(mapOf("status" to "ok", "timestamp" to System.currentTimeMillis())))
+                call.respond(ApiResponse.success(HealthStatusResponse("ok", System.currentTimeMillis())))
             }
 
             // 认证相关
@@ -91,9 +95,24 @@ class ApiService @Inject constructor(
                     }
                 }
 
+                // 员工信息
+                route("/api/employees") {
+                    get {
+                        handleGetEmployees(call)
+                    }
+
+                    get("/sync") {
+                        handleSyncEmployees(call)
+                    }
+                }
+
                 // 图片下载
                 get("/api/images/{filename}") {
                     handleGetImage(call)
+                }
+
+                get("/api/employee-images/{filename}") {
+                    handleGetEmployeeImage(call)
                 }
 
                 get("/downloads/{filename}") {
@@ -146,6 +165,7 @@ class ApiService @Inject constructor(
                 user = UserInfo(id = userId, username = request.username, name = "管理员")
             )
 
+            Timber.d("Login success: ${request.username}")
             call.respond(ApiResponse.success(response))
 
         } catch (e: Exception) {
@@ -375,12 +395,12 @@ class ApiService @Inject constructor(
         val startTime = System.currentTimeMillis()
 
         try {
-            val params = call.receive<Map<String, String>>()
-            val startDate = params["startDate"]
-            val endDate = params["endDate"]
-            val format = params["format"] ?: "csv"
+            val request = call.receive<ExportRequest>()
+            val startDate = request.startDate
+            val endDate = request.endDate
+            val format = request.format
 
-            if (startDate == null || endDate == null) {
+            if (startDate.isBlank() || endDate.isBlank()) {
                 call.respond(HttpStatusCode.BadRequest, ApiResponse.error<ExportResponse>(ErrorCodes.INVALID_PARAMS, "startDate 和 endDate 不能为空"))
                 return
             }
@@ -425,6 +445,106 @@ class ApiService @Inject constructor(
     }
 
     /**
+     * 处理获取员工列表
+     */
+    private suspend fun handleGetEmployees(call: ApplicationCall) {
+        val startTime = System.currentTimeMillis()
+        var responseCode = 0
+        var errorMessage: String? = null
+
+        try {
+            Timber.d("handleGetEmployees: 开始获取员工列表")
+            
+            val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+            val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull()?.coerceAtMost(100) ?: 20
+            val employeeId = call.request.queryParameters["employeeId"]
+            val isActive = call.request.queryParameters["isActive"]?.toBooleanStrictOrNull()
+
+            Timber.d("handleGetEmployees: page=$page, pageSize=$pageSize, employeeId=$employeeId, isActive=$isActive")
+
+            // 获取所有员工 - 使用 first() 获取第一个值
+            val allUsers = userRepository.observeAllUsers().first()
+
+            Timber.d("handleGetEmployees: 总用户数 = ${allUsers.size}")
+
+            // 过滤
+            var filteredUsers: List<User> = allUsers
+            if (!employeeId.isNullOrBlank()) {
+                filteredUsers = filteredUsers.filter { it.employeeId == employeeId }
+            }
+            if (isActive != null) {
+                filteredUsers = filteredUsers.filter { it.isActive == isActive }
+            }
+
+            // 转换为响应对象
+            val employeeResponses = filteredUsers.map { it.toEmployeeResponse() }
+
+            // 分页
+            val total = employeeResponses.size
+            val totalPages = (total + pageSize - 1) / pageSize
+            val pagedEmployees = employeeResponses
+                .drop((page - 1) * pageSize)
+                .take(pageSize)
+
+            val response = PageResponse(
+                list = pagedEmployees,
+                pagination = Pagination(
+                    page = page,
+                    pageSize = pageSize,
+                    total = total.toLong(),
+                    totalPages = totalPages
+                )
+            )
+
+            call.respond(ApiResponse.success(response))
+
+        } catch (e: Exception) {
+            Timber.e(e, "Get employees failed")
+            responseCode = ErrorCodes.INTERNAL_ERROR
+            errorMessage = e.message
+            call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<PageResponse<EmployeeResponse>>(ErrorCodes.INTERNAL_ERROR, "查询失败: ${e.message}"))
+        } finally {
+            logAccess(call, "/api/employees", "GET", responseCode, errorMessage, System.currentTimeMillis() - startTime)
+        }
+    }
+
+    /**
+     * 处理员工增量同步
+     */
+    private suspend fun handleSyncEmployees(call: ApplicationCall) {
+        val startTime = System.currentTimeMillis()
+        var responseCode = 0
+        var errorMessage: String? = null
+
+        try {
+            val lastEmployeeId = call.request.queryParameters["lastEmployeeId"]?.toLongOrNull() ?: 0
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceAtMost(500) ?: 100
+
+            val employees = userRepository.getUsersAfterId(lastEmployeeId, limit)
+            val employeeResponses = employees.map { it.toEmployeeResponse() }
+
+            val lastId = employees.lastOrNull()?.id ?: lastEmployeeId
+
+            val response = SyncResponse(
+                list = employeeResponses,
+                hasMore = employees.size >= limit,
+                lastRecordId = lastId,
+                syncTime = System.currentTimeMillis()
+            )
+
+            call.respond(ApiResponse.success(response))
+
+        } catch (e: Exception) {
+            Timber.e(e, "Sync employees failed")
+            responseCode = ErrorCodes.INTERNAL_ERROR
+            errorMessage = e.message
+            call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<SyncResponse<EmployeeResponse>>(ErrorCodes.INTERNAL_ERROR, "同步失败: ${e.message}"))
+        } finally {
+            logAccess(call, "/api/employees/sync", "GET", responseCode, errorMessage, System.currentTimeMillis() - startTime)
+        }
+    }
+
+    /**
      * 处理图片下载
      */
     private suspend fun handleGetImage(call: ApplicationCall) {
@@ -463,6 +583,51 @@ class ApiService @Inject constructor(
             call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<String>(responseCode, "获取图片失败: ${e.message}"))
         } finally {
             logAccess(call, "/api/images/{filename}", "GET", responseCode, null, System.currentTimeMillis() - startTime)
+        }
+    }
+
+    /**
+     * 处理员工图片下载
+     */
+    private suspend fun handleGetEmployeeImage(call: ApplicationCall) {
+        val startTime = System.currentTimeMillis()
+        var responseCode = 0
+
+        try {
+            val filename = call.parameters["filename"]
+
+            if (filename.isNullOrBlank()) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "文件名不能为空"))
+                return
+            }
+
+            // 安全检查
+            if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "非法文件名"))
+                return
+            }
+
+            // 图片存储在 records 目录
+            val file = FileUtil.getRecordImageFile(context, filename)
+            Timber.d("handleGetEmployeeImage: filename=$filename, file=${file?.absolutePath}, exists=${file?.exists()}")
+
+            if (file == null || !file.exists()) {
+                Timber.w("员工图片不存在: $filename, 查找路径: ${FileUtil.getRecordsDir(context)}")
+                responseCode = ErrorCodes.NOT_FOUND
+                call.respond(HttpStatusCode.NotFound, ApiResponse.error<String>(responseCode, "图片不存在"))
+                return
+            }
+
+            call.respondFile(file)
+
+        } catch (e: Exception) {
+            Timber.e(e, "Get employee image failed")
+            responseCode = ErrorCodes.INTERNAL_ERROR
+            call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<String>(responseCode, "获取图片失败: ${e.message}"))
+        } finally {
+            logAccess(call, "/api/employee-images/{filename}", "GET", responseCode, null, System.currentTimeMillis() - startTime)
         }
     }
 
@@ -648,6 +813,7 @@ class ApiService @Inject constructor(
                 details = details
             )
 
+            Timber.d("User sync success: received=${request.users.size}, success=$successCount, failed=$failedCount")
             call.respond(ApiResponse.success(response))
 
         } catch (e: Exception) {
@@ -721,5 +887,41 @@ class ApiService @Inject constructor(
             // TODO: 生产环境使用 BCrypt 或其他加密方式
             password
         }
+    }
+
+    /**
+     * 将 User 转换为 EmployeeResponse
+     */
+    private fun User.toEmployeeResponse(): EmployeeResponse {
+        Timber.d("toEmployeeResponse: faceImagePath=$faceImagePath, healthCertImagePath=$healthCertImagePath")
+        val faceImageUrl = faceImagePath?.let { path ->
+            val fileName = path.substringAfterLast("/")
+            if (fileName.isNotBlank()) {
+                Timber.d("toEmployeeResponse: face fileName=$fileName")
+                "/api/employee-images/$fileName"
+            } else null
+        }
+        val healthCertImageUrl = healthCertImagePath.let { path ->
+            if (path.isNotBlank()) {
+                val fileName = path.substringAfterLast("/")
+                if (fileName.isNotBlank()) {
+                    Timber.d("toEmployeeResponse: cert fileName=$fileName")
+                    "/api/employee-images/$fileName"
+                } else null
+            } else null
+        }
+        return EmployeeResponse(
+            id = id,
+            name = name,
+            employeeId = employeeId,
+            idCardNumber = idCardNumber,
+            healthCertStatus = getHealthCertStatus().name,
+            healthCertStartDate = healthCertStartDate,
+            healthCertEndDate = healthCertEndDate,
+            faceImage = faceImageUrl,
+            healthCertImage = healthCertImageUrl,
+            isActive = isActive,
+            createdAt = createdAt
+        )
     }
 }

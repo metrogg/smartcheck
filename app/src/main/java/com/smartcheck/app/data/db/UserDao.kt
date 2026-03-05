@@ -12,6 +12,9 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE id = :userId")
     suspend fun getUserById(userId: Long): UserEntity?
     
+    @Query("SELECT * FROM users WHERE id > :lastId ORDER BY id ASC LIMIT :limit")
+    suspend fun getUsersAfterId(lastId: Long, limit: Int): List<UserEntity>
+    
     @Query("SELECT * FROM users WHERE employeeId = :employeeId")
     suspend fun getUserByEmployeeId(employeeId: String): UserEntity?
     

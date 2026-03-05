@@ -55,7 +55,12 @@ interface FaceEngine {
      * @return 是否注册成功
      */
     suspend fun registerUser(userId: Long, frames: List<Bitmap>): Boolean
-    
+
+    /**
+     * 刷新人脸特征缓存（当用户数据变化时调用）
+     */
+    fun refreshUserCache()
+
     /**
      * 释放资源
      */

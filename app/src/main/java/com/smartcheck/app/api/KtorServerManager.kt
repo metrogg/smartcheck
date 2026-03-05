@@ -2,6 +2,7 @@ package com.smartcheck.app.api
 
 import android.content.Context
 import com.smartcheck.app.api.model.ErrorCodes
+import com.smartcheck.app.api.model.ErrorResponse
 import com.smartcheck.app.data.db.ApiTokenDao
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.http.*
@@ -93,6 +94,8 @@ class KtorServerManager @Inject constructor(
                 prettyPrint = true
                 isLenient = true
                 ignoreUnknownKeys = true
+                explicitNulls = false
+                encodeDefaults = true
             })
         }
 
@@ -113,24 +116,29 @@ class KtorServerManager @Inject constructor(
                 realm = "SmartCheck API"
                 verifier(JwtUtil.verifyToken)
                 validate { credential ->
-                    val token = credential.payload.id
-                    // 验证 Token 是否在数据库中且未过期
-                    val tokenEntity = apiTokenDao.getValidToken(token)
-                    if (tokenEntity != null) {
-                        // 更新最后使用时间
-                        apiTokenDao.updateLastUsed(token)
-                        JWTPrincipal(credential.payload)
+                    // 使用 subject (userId) 来查找数据库中的 token
+                    val userId = credential.payload.subject?.toLongOrNull()
+                    if (userId != null) {
+                        // 查找该用户的有效 token
+                        val tokenEntities = apiTokenDao.getActiveTokensByUser(userId)
+                        if (tokenEntities.isNotEmpty()) {
+                            val tokenEntity = tokenEntities.first()
+                            apiTokenDao.updateLastUsed(tokenEntity.token)
+                            Timber.d("JWT validation success for user: ${tokenEntity.username}")
+                            JWTPrincipal(credential.payload)
+                        } else {
+                            Timber.w("JWT validation failed: no active token for userId=$userId")
+                            null
+                        }
                     } else {
+                        Timber.w("JWT validation failed: no subject in token")
                         null
                     }
                 }
                 challenge { defaultScheme, realm ->
                     call.respond(
                         HttpStatusCode.Unauthorized,
-                        mapOf(
-                            "code" to ErrorCodes.UNAUTHORIZED,
-                            "message" to "Token 无效或已过期"
-                        )
+                        ErrorResponse(ErrorCodes.UNAUTHORIZED, "Token 无效或已过期")
                     )
                 }
             }
@@ -142,10 +150,7 @@ class KtorServerManager @Inject constructor(
                 Timber.e(cause, "Unhandled exception in Ktor")
                 call.respond(
                     HttpStatusCode.InternalServerError,
-                    mapOf(
-                        "code" to ErrorCodes.INTERNAL_ERROR,
-                        "message" to "服务器内部错误: ${cause.message}"
-                    )
+                    ErrorResponse(ErrorCodes.INTERNAL_ERROR, "服务器内部错误: ${cause.message}")
                 )
             }
         }

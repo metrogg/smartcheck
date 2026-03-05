@@ -55,7 +55,11 @@ class MockFaceEngine @Inject constructor() : FaceEngine {
         delay(500)
         return true
     }
-    
+
+    override fun refreshUserCache() {
+        Timber.d("MockFaceEngine: refreshUserCache called (no-op)")
+    }
+
     override fun release() {
         Timber.d("MockFaceEngine: Released")
         isInitialized = false

@@ -44,7 +44,7 @@ class SeetaFaceEngine @Inject constructor(
 
     private val userFeatureCache = ConcurrentHashMap<Long, CachedUser>()
 
-    fun refreshUserCache() {
+    private fun loadUserCacheToMemory() {
         engineScope.launch {
             try {
                 val users = userRepository.observeAllUsers().first()
@@ -106,7 +106,7 @@ class SeetaFaceEngine @Inject constructor(
                 )
             } else {
                 Timber.i("SeetaFaceEngine init ok (%s) time=%dms", source, elapsed)
-                refreshUserCache()
+                loadUserCacheToMemory()
             }
         }
     }
@@ -171,7 +171,7 @@ class SeetaFaceEngine @Inject constructor(
                 }
 
                 if (userFeatureCache.isEmpty()) {
-                    refreshUserCache()
+                    loadUserCacheToMemory()
                 }
 
                 val cachedUsers = userFeatureCache.values.toList()
@@ -290,6 +290,11 @@ class SeetaFaceEngine @Inject constructor(
 
             true
         }
+    }
+
+    override fun refreshUserCache() {
+        Timber.d("[FaceEngine] 手动刷新用户特征缓存")
+        loadUserCacheToMemory()
     }
 
     override fun release() {

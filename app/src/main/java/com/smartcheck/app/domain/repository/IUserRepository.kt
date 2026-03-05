@@ -12,6 +12,8 @@ interface IUserRepository {
 
     suspend fun getUserByEmployeeId(employeeId: String): Result<User>
 
+    suspend fun getUsersAfterId(lastId: Long, limit: Int): List<User>
+
     suspend fun getUserByFaceFeature(embedding: ByteArray): Result<User>
 
     suspend fun createUser(user: User): Result<Long>
