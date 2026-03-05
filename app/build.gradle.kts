@@ -76,7 +76,7 @@ android {
 dependencies {
     // Hand SDK
     implementation(project(":hand-sdk"))
-    // Face SDK (SeetaFace2 wrapper)
+    // Face SDK (SeetaFace6)
     implementation(project(":face-sdk"))
     
     // AndroidX Core

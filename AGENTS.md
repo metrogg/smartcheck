@@ -12,7 +12,7 @@ This file is the primary repo guide for agentic coding tools operating in this r
 ## Project Snapshot
 
 SmartCheck is an Android AIoT morning inspection app for industrial devices. Major capabilities:
-- Face recognition (SeetaFace2 via `:face-sdk` JNI)
+- Face recognition (SeetaFace6 via `:face-sdk` JNI)
 - Temperature measurement via serial/hardware abstractions
 - Hand foreign-object detection (RKNN + OpenCV + JNI in `:hand-sdk`)
 
@@ -21,7 +21,7 @@ Tech stack: Kotlin, Jetpack Compose, MVVM, Room, Hilt, Coroutines/Flow, CameraX,
 Modules:
 - `:app` Android application (`com.smartcheck.app`)
 - `:hand-sdk` Android library + native (RKNN) (`com.smartcheck.sdk`)
-- `:face-sdk` Android library + native (SeetaFace2) (`com.smartcheck.sdk.face`)
+- `:face-sdk` Android library + native (SeetaFace6) (`com.smartcheck.sdk.face`)
 
 Notable repo content:
 - `third_party/` contains vendor headers/assets; avoid changing unless intentional.

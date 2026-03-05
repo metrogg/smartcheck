@@ -24,16 +24,14 @@ data class FaceResult(
 /**
  * 人脸识别引擎接口
  * 
- * 设计基于 SeetaFace2 的能力：
+ * 设计基于 SeetaFace6 的能力：
  * - 人脸检测（FaceDetector）
  * - 关键点定位（FaceLandmarker）
  * - 人脸识别（FaceRecognizer）
- * - 活体检测（可选）
+ * - 活体检测（FaceAntiSpoofing）
+ * - 口罩检测、性别/年龄估计等
  * 
- * 当前提供 Mock 实现，将来接入 SeetaFace2 C++ SDK 时：
- * 1. 在 app/src/main/cpp/ 下实现 JNI 封装
- * 2. 加载 SeetaFace2 模型文件
- * 3. 实现 SeetaFaceEngine 替换 MockFaceEngine
+ * 当前通过 face-sdk 模块（SeetaFace6 JNI）实现
  */
 interface FaceEngine {
     
