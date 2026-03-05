@@ -146,7 +146,7 @@ class AdminAuthRepository @Inject constructor(
         private const val KEY_ACCOUNT = "account"
 
         const val DEFAULT_ACCOUNT = "admin"
-        // 默认密码为空，强制首次登录时设置密码
-        const val DEFAULT_PASSWORD = ""
+        // 默认密码
+        const val DEFAULT_PASSWORD = "123456"
     }
 }

@@ -46,7 +46,7 @@ fun AdminLoginScreen(
     
     // 激活相关
     var showActivationDialog by remember { mutableStateOf(false) }
-    var serverUrl by remember { mutableStateOf("") }
+    var serverUrl by remember { mutableStateOf("http://n629a758.natappfree.cc") }
     var activationCode by remember { mutableStateOf("") }
     var activationError by remember { mutableStateOf<String?>(null) }
     var isActivating by remember { mutableStateOf(false) }
@@ -265,7 +265,7 @@ fun AdminLoginScreen(
                                 value = serverUrl,
                                 onValueChange = { serverUrl = it },
                                 label = { Text("激活服务器地址") },
-                                placeholder = { Text("http://192.168.1.100:8080") },
+                                placeholder = { Text("http://n629a758.natappfree.cc") },
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
