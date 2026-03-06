@@ -433,21 +433,24 @@ class MainViewModel @Inject constructor(
     }
     
     /**
-     * 手检通过
+     * 手检通过 - 全正常情况，等待用户确认后保存记录
      */
     private fun onHandCheckPass() {
-        Timber.tag("MainViewModel").d("Hand check passed")
+        Timber.tag("MainViewModel").d("Hand check passed - waiting for confirmation")
 
         _handDetectionState.value = emptyList()
+        
+        hardwareRepository.beep("success")
+        morningCheckUseCase.speakAllPass()
+
         _uiState.update {
             it.copy(
-                state = CheckState.SYMPTOM_CHECKING,
-                message = "请回答健康询问",
-                autoSubmitRemainingSec = null
+                state = CheckState.ALL_PASS,
+                message = "晨检通过！",
+                symptomFlags = ""
             )
         }
-        morningCheckUseCase.speakHandCheckPass()
-
+        
         UserActionTracker.track(ActionType.HAND_CHECK_COMPLETED, "MainScreen", "result=pass")
     }
     
@@ -461,13 +464,13 @@ class MainViewModel @Inject constructor(
             it.copy(
                 state = CheckState.HAND_FAIL,
                 message = "手部检测不合格：${issues.joinToString(", ")}",
-                handDetectionResults = issues
+                handDetectionResults = issues,
+                handHasIssue = true
             )
         }
         
         hardwareRepository.beep("error")
         morningCheckUseCase.speakHandCheckFail()
-        _uiState.update { it.copy(symptomFlags = issues.joinToString(", ")) }
     }
 
     fun submitSymptoms(symptoms: List<String>) {
@@ -512,6 +515,8 @@ class MainViewModel @Inject constructor(
 
         hardwareRepository.beep("error")
         morningCheckUseCase.speakSymptomFail()
+        
+        finalizeCheckRecord()
     }
 
     fun finalizeCheckRecord() {
@@ -519,11 +524,11 @@ class MainViewModel @Inject constructor(
         if (state.isSubmitting || state.isRecordFinalized) return
         if (state.currentUserId == null) return
         if (state.state == CheckState.SYMPTOM_CHECKING) return
-        if (state.handHasIssue) return
+        if (state.state == CheckState.IDLE) return
 
         val isPassed = state.state == CheckState.ALL_PASS
         val isTempNormal = state.state != CheckState.TEMP_FAIL
-        val isHandNormal = state.state != CheckState.HAND_FAIL
+        val isHandNormal = !state.handHasIssue
 
         _uiState.update { it.copy(isSubmitting = true) }
 
@@ -877,6 +882,12 @@ class MainViewModel @Inject constructor(
     ) {
         if (isIssue) {
             hardwareRepository.beep("error")
+            _uiState.update {
+                it.copy(
+                    state = CheckState.HAND_FAIL,
+                    message = "手部检测不合格"
+                )
+            }
         } else {
             hardwareRepository.beep("success")
         }
@@ -927,7 +938,15 @@ class MainViewModel @Inject constructor(
         issues: List<String> = emptyList(),
         isIssue: Boolean = false
     ) {
-        if (!isIssue) {
+        if (isIssue) {
+            hardwareRepository.beep("error")
+            _uiState.update {
+                it.copy(
+                    state = CheckState.HAND_FAIL,
+                    message = "手部检测不合格"
+                )
+            }
+        } else {
             hardwareRepository.beep("success")
         }
         if (currentBackBitmap == null) {

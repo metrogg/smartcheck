@@ -29,7 +29,7 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            adminAuthRepository.observeAccount().collect { value ->
+            adminAuthRepository.observeCurrentUsername().collect { value ->
                 if (value != null) {
                     _account.value = value
                 }

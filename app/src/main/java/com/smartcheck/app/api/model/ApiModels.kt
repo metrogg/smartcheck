@@ -231,10 +231,13 @@ data class EmployeeResponse(
 
 /**
  * 员工导入请求
+ * @param employees 员工列表
+ * @param incremental 是否增量导入（true: 跳过已存在的员工, false: 覆盖已存在的员工）
  */
 @Serializable
 data class EmployeeImportRequest(
-    val employees: List<EmployeeImportItem>
+    val employees: List<EmployeeImportItem>,
+    val incremental: Boolean = true
 )
 
 /**
@@ -292,6 +295,24 @@ data class ExportRequest(
     val endDate: String,
     val format: String = "csv",
     val employeeId: String? = null
+)
+
+/**
+ * 删除员工响应
+ */
+@Serializable
+data class DeleteEmployeeResponse(
+    val employeeId: String,
+    val deleted: Boolean
+)
+
+/**
+ * 清空所有员工响应
+ */
+@Serializable
+data class ClearAllEmployeesResponse(
+    val deleted: Boolean,
+    val message: String
 )
 
 

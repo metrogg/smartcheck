@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.nio.ByteBuffer
@@ -45,21 +46,23 @@ class SeetaFaceEngine @Inject constructor(
     private val userFeatureCache = ConcurrentHashMap<Long, CachedUser>()
 
     private fun loadUserCacheToMemory() {
-        engineScope.launch {
-            try {
-                val users = userRepository.observeAllUsers().first()
-                val newCache = ConcurrentHashMap<Long, CachedUser>()
-                for (user in users) {
-                    val bytes = user.faceEmbedding ?: continue
-                    val feature = byteArrayToFloatArray(bytes) ?: continue
-                    newCache[user.id] = CachedUser(user.id, user.name, feature)
-                }
-                userFeatureCache.clear()
-                userFeatureCache.putAll(newCache)
-                Timber.d("[FaceEngine] 用户特征缓存已刷新: ${newCache.size} 个用户")
-            } catch (e: Exception) {
-                Timber.e(e, "[FaceEngine] 刷新用户缓存失败")
+        loadUserCacheToMemorySync()
+    }
+
+    private fun loadUserCacheToMemorySync() {
+        try {
+            val users = runBlocking { userRepository.observeAllUsers().first() }
+            val newCache = ConcurrentHashMap<Long, CachedUser>()
+            for (user in users) {
+                val bytes = user.faceEmbedding ?: continue
+                val feature = byteArrayToFloatArray(bytes) ?: continue
+                newCache[user.id] = CachedUser(user.id, user.name, feature)
             }
+            userFeatureCache.clear()
+            userFeatureCache.putAll(newCache)
+            Timber.d("[FaceEngine] 用户特征缓存已刷新: ${newCache.size} 个用户")
+        } catch (e: Exception) {
+            Timber.e(e, "[FaceEngine] 刷新用户缓存失败")
         }
     }
 

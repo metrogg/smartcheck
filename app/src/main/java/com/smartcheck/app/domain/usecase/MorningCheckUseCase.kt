@@ -289,7 +289,7 @@ class MorningCheckUseCase @Inject constructor(
             isAllowedToContinue = isAllowedToContinue,
             faceConfidence = confidence,
             message = when (healthCertStatus) {
-                HealthCertStatus.EXPIRED -> "健康证已过期，禁止上岗"
+                HealthCertStatus.EXPIRED -> "健康证已过期，禁止晨检"
                 HealthCertStatus.EXPIRING_SOON -> "欢迎，$userName，健康证即将到期"
                 else -> "欢迎，$userName"
             }
@@ -297,7 +297,7 @@ class MorningCheckUseCase @Inject constructor(
     }
 
     fun speakHealthCertExpired() {
-        voiceService.speak("健康证已过期，禁止上岗")
+        voiceService.speak("健康证已过期，禁止晨检")
     }
 
     fun speak(text: String) {

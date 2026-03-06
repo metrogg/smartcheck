@@ -29,4 +29,10 @@ interface UserDao {
     
     @Query("DELETE FROM users WHERE id = :userId")
     suspend fun deleteUserById(userId: Long)
+    
+    @Query("DELETE FROM users WHERE employeeId = :employeeId")
+    suspend fun deleteUserByEmployeeId(employeeId: String)
+    
+    @Query("DELETE FROM users")
+    suspend fun deleteAllUsers()
 }

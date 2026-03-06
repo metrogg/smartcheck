@@ -86,4 +86,22 @@ class UserRepository @Inject constructor(
             Result.failure(AppError.UnknownError(e.message ?: "deleteUser failed"))
         }
     }
+
+    override suspend fun deleteUserByEmployeeId(employeeId: String): Result<Unit> {
+        return try {
+            userDao.deleteUserByEmployeeId(employeeId)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(AppError.UnknownError(e.message ?: "deleteUserByEmployeeId failed"))
+        }
+    }
+
+    override suspend fun deleteAllUsers(): Result<Unit> {
+        return try {
+            userDao.deleteAllUsers()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(AppError.UnknownError(e.message ?: "deleteAllUsers failed"))
+        }
+    }
 }

@@ -117,6 +117,7 @@ fun HomeScreen(
     var autoNavigateState by remember { mutableStateOf<CheckState?>(null) }
     var cameraInitState by remember { mutableStateOf(com.smartcheck.app.ui.components.CameraInitState.Initializing) }
     var showHandFailDialog by remember { mutableStateOf(false) }
+    var showAllPassDialog by remember { mutableStateOf(false) }
     var lastHandIssueShownAt by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(uiState.state) {
@@ -125,6 +126,12 @@ fun HomeScreen(
             symptomConfirmed = false
         } else {
             showSymptomDialog = false
+        }
+
+        if (uiState.state == CheckState.ALL_PASS && !uiState.handHasIssue) {
+            showAllPassDialog = true
+        } else {
+            showAllPassDialog = false
         }
 
         if (uiState.state == CheckState.HAND_FAIL && uiState.handHasIssue) {
@@ -727,8 +734,45 @@ fun HomeScreen(
                 },
                 confirmButton = {
                     Button(
-                        onClick = { showHandFailDialog = false },
+                        onClick = {
+                            showHandFailDialog = false
+                            viewModel.finalizeCheckRecord()
+                            viewModel.reset()
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text(text = "确认", fontSize = Dimens.TextSizeNormal, color = Color.White)
+                    }
+                }
+            )
+        }
+    }
+
+    androidx.compose.animation.AnimatedContent(
+        targetState = showAllPassDialog,
+        transitionSpec = { androidx.compose.animation.fadeIn(tween(200)) with androidx.compose.animation.fadeOut(tween(200)) },
+        label = "AllPassDialog"
+    ) { visible ->
+        if (visible) {
+            AlertDialog(
+                onDismissRequest = { },
+                title = {
+                    Text(text = "晨检通过", color = BrandGreen, fontSize = Dimens.TextSizeLarge)
+                },
+                text = {
+                    Text(
+                        text = "体温正常，手部检测正常",
+                        fontSize = Dimens.TextSizeNormal
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showAllPassDialog = false
+                            viewModel.finalizeCheckRecord()
+                            viewModel.reset()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandGreen)
                     ) {
                         Text(text = "确认", fontSize = Dimens.TextSizeNormal, color = Color.White)
                     }

@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
@@ -81,6 +83,7 @@ fun SettingsScreen(
     val loginTitle by viewModel.loginTitle.collectAsState()
     val loginBackground by viewModel.loginBackground.collectAsState()
     val adminAvatar by viewModel.adminAvatar.collectAsState()
+    val voiceEnabled by viewModel.voiceEnabled.collectAsState()
     val context = LocalContext.current
 
     val currentAccount by authViewModel.account.collectAsState()
@@ -219,16 +222,6 @@ fun SettingsScreen(
                         fontSize = Dimens.TextSizeNormal
                     )
                 }
-                Text(
-                    text = "设备设置",
-                    color = Color.White,
-                    fontSize = Dimens.TextSizeNormal
-                )
-                Text(
-                    text = "导出管理",
-                    color = Color.White,
-                    fontSize = Dimens.TextSizeNormal
-                )
             }
         }
 
@@ -445,59 +438,6 @@ fun SettingsScreen(
                     onEdit = { openEdit("登录页标题", loginTitle) { viewModel.setLoginTitle(it) } },
                     preview = if (loginTitle.isBlank()) "欢迎使用智能晨检仪" else loginTitle
                 )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "登录页背景图",
-                            fontSize = Dimens.TextSizeNormal,
-                            color = Color(0xFF111827)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(120.dp, 70.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFFE5E7EB)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (loginBackground.isNotBlank()) {
-                                AsyncImage(
-                                    model = loginBackground,
-                                    contentDescription = "背景缩略图",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Text(text = "无", color = Color.Gray)
-                            }
-                        }
-                    }
-                    Text(
-                        text = "修改",
-                        color = Color(0xFF2563EB),
-                        fontSize = Dimens.TextSizeNormal,
-                        modifier = Modifier.clickable {
-                            showBackgroundMenu = true
-                        }
-                    )
-                    DropdownMenu(
-                        expanded = showBackgroundMenu,
-                        onDismissRequest = { showBackgroundMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("从相册选择") },
-                            onClick = {
-                                showBackgroundMenu = false
-                                backgroundPicker.launch("image/*")
-                            }
-                        )
-                    }
-                }
 
                 Button(
                     onClick = { viewModel.clearRecordImages() },

@@ -122,6 +122,14 @@ class ApiService @Inject constructor(
                     post("/upload-cert-photo") {
                         handleUploadHealthCertPhoto(call)
                     }
+
+                    delete("/{employeeId}") {
+                        handleDeleteEmployee(call)
+                    }
+
+                    delete("/clear-all") {
+                        handleClearAllEmployees(call)
+                    }
                 }
 
                 // 图片下载
@@ -133,7 +141,7 @@ class ApiService @Inject constructor(
                     handleGetEmployeeImage(call)
                 }
 
-                get("/downloads/{filename}") {
+                get("/api/downloads/{filename}") {
                     handleDownloadFile(call)
                 }
             }
@@ -585,11 +593,12 @@ class ApiService @Inject constructor(
                 return
             }
 
-            Timber.d("开始导入 ${request.employees.size} 个员工")
+            Timber.d("开始导入 ${request.employees.size} 个员工 (incremental=${request.incremental})")
             
             val details = mutableListOf<EmployeeImportDetail>()
             var successCount = 0
             var failedCount = 0
+            val incremental = request.incremental
 
             // 初始化人脸引擎（一次）
             if (!com.smartcheck.sdk.face.FaceSdk.isInitialized()) {
@@ -633,14 +642,101 @@ class ApiService @Inject constructor(
                     // 检查是否已存在（包括手动注册的员工）
                     val existingUser = userRepository.getUserByEmployeeId(employeeId).getOrNull()
                     if (existingUser != null) {
-                        details.add(EmployeeImportDetail(
-                            employeeId = employeeId,
-                            status = "failed",
-                            message = "员工工号已存在",
-                            userId = existingUser.id
-                        ))
-                        failedCount++
-                        continue
+                        if (incremental) {
+                            // 增量模式：跳过已存在的员工
+                            details.add(EmployeeImportDetail(
+                                employeeId = employeeId,
+                                status = "skipped",
+                                message = "员工工号已存在，跳过",
+                                userId = existingUser.id
+                            ))
+                            successCount++
+                            continue
+                        } else {
+                            // 非增量模式：更新已存在的员工
+                            // 处理人脸图片更新
+                            var faceEmbedding = existingUser.faceEmbedding
+                            var faceImagePath = existingUser.faceImagePath
+                            
+                            if (!item.faceImageBase64.isNullOrBlank()) {
+                                try {
+                                    val imageBytes = android.util.Base64.decode(item.faceImageBase64, android.util.Base64.DEFAULT)
+                                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                                    
+                                    if (bitmap != null) {
+                                        val faces = com.smartcheck.sdk.face.FaceSdk.detect(bitmap)
+                                        if (faces.isNotEmpty()) {
+                                            val feature = com.smartcheck.sdk.face.FaceSdk.extractFeature(bitmap)
+                                            if (feature != null) {
+                                                faceEmbedding = floatArrayToByteArray(feature)
+                                                val faceFileName = "face_emp_${System.currentTimeMillis()}_${existingUser.id}.jpg"
+                                                val faceFile = java.io.File(FileUtil.getRecordsDir(context), faceFileName)
+                                                java.io.FileOutputStream(faceFile).use { out ->
+                                                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                                                }
+                                                faceImagePath = faceFileName
+                                            }
+                                        }
+                                        bitmap.recycle()
+                                    }
+                                } catch (e: Exception) {
+                                    Timber.w(e, "更新人脸图片失败: $employeeId")
+                                }
+                            }
+
+                            // 处理健康证图片更新
+                            var healthCertImagePath = existingUser.healthCertImagePath
+                            if (!item.healthCertImageBase64.isNullOrBlank()) {
+                                try {
+                                    val imageBytes = android.util.Base64.decode(item.healthCertImageBase64, android.util.Base64.DEFAULT)
+                                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                                    
+                                    if (bitmap != null) {
+                                        val certFileName = "cert_emp_${System.currentTimeMillis()}_${existingUser.id}.jpg"
+                                        val certFile = java.io.File(FileUtil.getRecordsDir(context), certFileName)
+                                        java.io.FileOutputStream(certFile).use { out ->
+                                            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                                        }
+                                        healthCertImagePath = certFileName
+                                        bitmap.recycle()
+                                    }
+                                } catch (e: Exception) {
+                                    Timber.w(e, "更新健康证图片失败: $employeeId")
+                                }
+                            }
+
+                            val updatedUser = existingUser.copy(
+                                name = item.name.trim(),
+                                idCardNumber = item.idCardNumber.trim(),
+                                faceImagePath = faceImagePath ?: existingUser.faceImagePath,
+                                faceEmbedding = faceEmbedding ?: existingUser.faceEmbedding,
+                                healthCertImagePath = healthCertImagePath ?: existingUser.healthCertImagePath,
+                                healthCertStartDate = item.healthCertStartDate,
+                                healthCertEndDate = item.healthCertEndDate,
+                                isActive = item.isActive
+                            )
+
+                            val updateResult = userRepository.updateUser(updatedUser)
+                            if (updateResult.isFailure) {
+                                details.add(EmployeeImportDetail(
+                                    employeeId = employeeId,
+                                    status = "failed",
+                                    message = "更新员工失败: ${updateResult.exceptionOrNull()?.message}",
+                                    userId = existingUser.id
+                                ))
+                                failedCount++
+                                continue
+                            }
+
+                            details.add(EmployeeImportDetail(
+                                employeeId = employeeId,
+                                status = "updated",
+                                message = "更新成功",
+                                userId = existingUser.id
+                            ))
+                            successCount++
+                            continue
+                        }
                     }
 
                     // 创建员工
@@ -786,6 +882,100 @@ class ApiService @Inject constructor(
             call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<EmployeeImportResponse>(ErrorCodes.INTERNAL_ERROR, "导入失败: ${e.message}"))
         } finally {
             logAccess(call, "/api/employees/import", "POST", responseCode, errorMessage, System.currentTimeMillis() - startTime)
+        }
+    }
+
+    /**
+     * 处理删除员工
+     * DELETE /api/employees/{employeeId}
+     */
+    private suspend fun handleDeleteEmployee(call: ApplicationCall) {
+        val startTime = System.currentTimeMillis()
+        var responseCode = 0
+        var errorMessage: String? = null
+        var loggedEmployeeId = "unknown"
+
+        try {
+            val employeeId = call.parameters["employeeId"]
+            loggedEmployeeId = employeeId ?: "unknown"
+            if (employeeId.isNullOrBlank()) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "工号不能为空"))
+                return
+            }
+
+            val trimmedId = employeeId.trim()
+            loggedEmployeeId = trimmedId
+            val existingUser = userRepository.getUserByEmployeeId(trimmedId).getOrNull()
+            if (existingUser == null) {
+                responseCode = ErrorCodes.NOT_FOUND
+                call.respond(HttpStatusCode.NotFound, ApiResponse.error<String>(responseCode, "员工不存在: $trimmedId"))
+                return
+            }
+
+            val deleteResult = userRepository.deleteUserByEmployeeId(trimmedId)
+            if (deleteResult.isFailure) {
+                responseCode = ErrorCodes.INTERNAL_ERROR
+                errorMessage = deleteResult.exceptionOrNull()?.message ?: "删除失败"
+                call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<String>(responseCode, errorMessage!!))
+                return
+            }
+
+            // 刷新人脸特征缓存
+            try {
+                faceEngine.refreshUserCache()
+            } catch (e: Exception) {
+                Timber.w(e, "刷新人脸缓存失败")
+            }
+
+            Timber.d("删除员工成功: $trimmedId")
+            call.respond(ApiResponse.success(DeleteEmployeeResponse(employeeId = trimmedId, deleted = true)))
+
+        } catch (e: Exception) {
+            Timber.e(e, "Delete employee failed")
+            responseCode = ErrorCodes.INTERNAL_ERROR
+            errorMessage = e.message
+            call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<String>(ErrorCodes.INTERNAL_ERROR, "删除失败: ${e.message}"))
+        } finally {
+            logAccess(call, "/api/employees/$loggedEmployeeId", "DELETE", responseCode, errorMessage, System.currentTimeMillis() - startTime)
+        }
+    }
+
+    /**
+     * 处理清空所有员工
+     * DELETE /api/employees/clear-all
+     */
+    private suspend fun handleClearAllEmployees(call: ApplicationCall) {
+        val startTime = System.currentTimeMillis()
+        var responseCode = 0
+        var errorMessage: String? = null
+
+        try {
+            val deleteResult = userRepository.deleteAllUsers()
+            if (deleteResult.isFailure) {
+                responseCode = ErrorCodes.INTERNAL_ERROR
+                errorMessage = deleteResult.exceptionOrNull()?.message ?: "清空失败"
+                call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<String>(responseCode, errorMessage!!))
+                return
+            }
+
+            // 刷新人脸特征缓存
+            try {
+                faceEngine.refreshUserCache()
+            } catch (e: Exception) {
+                Timber.w(e, "刷新人脸缓存失败")
+            }
+
+            Timber.d("清空所有员工成功")
+            call.respond(ApiResponse.success(ClearAllEmployeesResponse(deleted = true, message = "所有员工已清空")))
+
+        } catch (e: Exception) {
+            Timber.e(e, "Clear all employees failed")
+            responseCode = ErrorCodes.INTERNAL_ERROR
+            errorMessage = e.message
+            call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<String>(ErrorCodes.INTERNAL_ERROR, "清空失败: ${e.message}"))
+        } finally {
+            logAccess(call, "/api/employees/clear-all", "DELETE", responseCode, errorMessage, System.currentTimeMillis() - startTime)
         }
     }
 

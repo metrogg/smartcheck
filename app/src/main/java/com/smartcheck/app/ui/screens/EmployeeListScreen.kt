@@ -77,7 +77,7 @@ fun EmployeeListScreen(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "批量管理",
+                    text = "查找员工",
                     color = Color.Black,
                     fontSize = Dimens.TextSizeNormal
                 )

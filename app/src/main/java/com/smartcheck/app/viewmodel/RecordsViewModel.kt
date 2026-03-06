@@ -100,6 +100,10 @@ class RecordsViewModel @Inject constructor(
         _query.value = value
     }
 
+    fun setHandStatusFilter(status: String?) {
+        _handStatus.value = if (status.isNullOrEmpty()) emptySet() else setOf(status)
+    }
+
     fun toggleHandStatus(value: String) {
         _handStatus.value = toggleSetValue(_handStatus.value, value)
     }

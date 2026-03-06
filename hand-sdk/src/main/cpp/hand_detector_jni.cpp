@@ -173,7 +173,20 @@ extern "C"
             HandResult hand_result;
             hand_result.id = static_cast<int>(i);
             hand_result.box = hand_box; // 始终使用手部框（全图显示）
-            hand_result.hasForeignObject = !foreign_result.boxes.empty();
+
+            // 判断是否有异物（排除 toilet_paper/纸巾）
+            bool hasForeign = false;
+            if (!foreign_result.boxes.empty()) {
+                for (size_t j = 0; j < foreign_result.class_names.size(); j++) {
+                    const std::string& class_name = foreign_result.class_names[j];
+                    // 排除纸巾 (toilet_paper)
+                    if (class_name != "toilet_paper" && class_name != "hand") {
+                        hasForeign = true;
+                        break;
+                    }
+                }
+            }
+            hand_result.hasForeignObject = hasForeign;
             if (!foreign_result.boxes.empty() && !foreign_result.class_names.empty() && !foreign_result.scores.empty())
             {
                 // Overall label/score: top-1 foreign object

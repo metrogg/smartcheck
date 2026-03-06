@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -28,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,6 +46,7 @@ import com.smartcheck.app.ui.components.RecordDetailDialog
 import com.smartcheck.app.ui.theme.BrandGreen
 import com.smartcheck.app.ui.theme.Dimens
 import com.smartcheck.app.viewmodel.RecordsViewModel
+import com.smartcheck.app.viewmodel.RecordsViewModel.TimeFilter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -58,9 +60,35 @@ fun AdminScreen(
 ) {
     val records by viewModel.records.collectAsState()
     val query by viewModel.query.collectAsState()
-    var dateFilter by remember { mutableStateOf("") }
+    var selectedTimeFilter by remember { mutableStateOf(TimeFilter.TODAY) }
     var statusFilter by remember { mutableStateOf("") }
     var selectedRecord by remember { mutableStateOf<RecordEntity?>(null) }
+
+    // 同步时间筛选
+    LaunchedEffect(selectedTimeFilter) {
+        viewModel.setTimeFilter(selectedTimeFilter)
+    }
+
+    // 同步状态筛选
+    LaunchedEffect(statusFilter) {
+        val statusValue = when (statusFilter) {
+            "通过" -> "NORMAL"
+            "不合格" -> "ABNORMAL"
+            else -> ""
+        }
+        viewModel.setHandStatusFilter(statusValue)
+    }
+
+    // 时间筛选选项
+    val timeFilterOptions = listOf(
+        "今天" to TimeFilter.TODAY,
+        "本周" to TimeFilter.WEEK,
+        "本月" to TimeFilter.MONTH,
+        "全部" to TimeFilter.ALL
+    )
+
+    // 状态筛选选项
+    val statusOptions = listOf("全部", "通过", "不合格")
 
     Column(
         modifier = Modifier
@@ -90,32 +118,63 @@ fun AdminScreen(
 
         Spacer(modifier = Modifier.height(Dimens.PaddingNormal))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingNormal),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FilterField(
-                label = "日期",
-                value = dateFilter,
-                onValueChange = { dateFilter = it },
-                trailingIcon = Icons.Default.ArrowDropDown,
-                modifier = Modifier.width(320.dp)
-            )
-            FilterField(
-                label = "人员",
-                value = query,
-                onValueChange = viewModel::setQuery,
-                trailingIcon = Icons.Default.Search,
-                modifier = Modifier.width(320.dp)
-            )
-            FilterField(
-                label = "状态",
-                value = statusFilter,
-                onValueChange = { statusFilter = it },
-                trailingIcon = Icons.Default.ArrowDropDown,
-                modifier = Modifier.width(320.dp)
-            )
+        // 筛选栏
+        Column {
+            // 日期和状态筛选按钮
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 日期筛选
+                Text("日期:", fontSize = Dimens.TextSizeNormal)
+                timeFilterOptions.forEach { (label, filter) ->
+                    val isSelected = selectedTimeFilter == filter
+                    Text(
+                        text = label,
+                        color = if (isSelected) BrandGreen else Color.Gray,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier
+                            .clickable { selectedTimeFilter = filter }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(Dimens.PaddingNormal))
+                
+                // 状态筛选
+                Text("状态:", fontSize = Dimens.TextSizeNormal)
+                statusOptions.forEach { option ->
+                    val isSelected = (option == "全部" && statusFilter.isEmpty()) || statusFilter == option
+                    Text(
+                        text = option,
+                        color = if (isSelected) BrandGreen else Color.Gray,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier
+                            .clickable { 
+                                statusFilter = if (option == "全部") "" else option 
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+            
+            // 人员搜索
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingNormal),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilterField(
+                    label = "人员",
+                    value = query,
+                    onValueChange = viewModel::setQuery,
+                    trailingIcon = Icons.Default.Search,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(Dimens.PaddingNormal))

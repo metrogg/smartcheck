@@ -8,6 +8,10 @@ interface IAdminAuthService {
 
     fun observeAccount(): Flow<String>
 
+    fun observeCurrentUsername(): Flow<String?>
+
+    fun getDefaultAccount(): String
+
     suspend fun login(account: String, password: String): Result<String>
 
     suspend fun logout(): Result<Unit>

@@ -51,6 +51,12 @@ class AdminAuthRepository @Inject constructor(
     private val _account = MutableStateFlow(prefs.getString(KEY_ACCOUNT, DEFAULT_ACCOUNT) ?: DEFAULT_ACCOUNT)
     override fun observeAccount(): Flow<String> = _account.asStateFlow()
 
+    override fun observeCurrentUsername(): Flow<String?> = _currentUsername.asStateFlow()
+
+    override fun getDefaultAccount(): String {
+        return prefs.getString(KEY_ACCOUNT, DEFAULT_ACCOUNT) ?: DEFAULT_ACCOUNT
+    }
+
     init {
         if (!prefs.contains(KEY_PASSWORD_HASH)) {
             setPassword(DEFAULT_PASSWORD)

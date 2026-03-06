@@ -10,7 +10,8 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 #define MODEL_INPUT_SIZE 640
-#define CONF_THRESHOLD 0.5f
+#define CONF_THRESHOLD 0.55f
+#define BAND_AID_THRESHOLD 0.65f
 #define NMS_THRESHOLD 0.45f
 #define NUM_KEYPOINTS 21
 
@@ -350,7 +351,13 @@ ForeignResult ForeignRknnEngine::postprocess(float* output, int crop_width, int 
         }
 
         float score = max_class_prob;
-        if (score < CONF_THRESHOLD) continue;
+        
+        float threshold = CONF_THRESHOLD;
+        if (max_class_id == 0) {
+            threshold = BAND_AID_THRESHOLD;
+        }
+        
+        if (score < threshold) continue;
 
         float cx = output[num_boxes * 0 + i];
         float cy = output[num_boxes * 1 + i];

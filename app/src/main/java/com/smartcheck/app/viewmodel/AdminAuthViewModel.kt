@@ -29,7 +29,10 @@ class AdminAuthViewModel @Inject constructor(
             adminAuthService.observeLoginState().collect { _isLoggedIn.value = it }
         }
         viewModelScope.launch {
-            adminAuthService.observeAccount().collect { _account.value = it }
+            // 优先使用当前登录用户名，如果为 null 则使用 SharedPrefs 中的账号
+            adminAuthService.observeCurrentUsername().collect { username ->
+                _account.value = username ?: adminAuthService.getDefaultAccount()
+            }
         }
     }
 
@@ -45,7 +48,6 @@ class AdminAuthViewModel @Inject constructor(
                     // 登录成功后设置角色
                     val role = if (account == "admin") "admin" else "employee"
                     _currentRole.value = role
-                    _account.value = account
                     onResult(Result.success("登录成功")) 
                 },
                 onFailure = { 

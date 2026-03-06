@@ -15,8 +15,18 @@ class TemperatureServiceImpl @Inject constructor(
     @Volatile
     private var initialized = false
 
+    companion object {
+        // 测温模块配置
+        const val TEMP_DEVICE_PATH = "/dev/ttyS7"
+        const val TEMP_BAUD_RATE = 115200
+    }
+
     override suspend fun initialize(): Result<Unit> {
         return try {
+            // 配置串口参数
+            serialPortManager.configure(TEMP_DEVICE_PATH, TEMP_BAUD_RATE)
+            
+            // 打开串口
             val opened = serialPortManager.open()
             if (opened) {
                 initialized = true

@@ -21,4 +21,8 @@ interface IUserRepository {
     suspend fun updateUser(user: User): Result<Unit>
 
     suspend fun deleteUser(userId: Long): Result<Unit>
+
+    suspend fun deleteUserByEmployeeId(employeeId: String): Result<Unit>
+
+    suspend fun deleteAllUsers(): Result<Unit>
 }
