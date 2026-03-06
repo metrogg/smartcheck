@@ -14,9 +14,14 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.serialization.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.utils.io.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.serialization.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -38,6 +43,7 @@ class ApiService @Inject constructor(
     private val adminAuthRepository: AdminAuthRepository,
     private val recordRepository: RecordRepository,
     private val userRepository: UserRepository,
+    private val faceEngine: com.smartcheck.app.ml.FaceEngine,
     private val apiTokenDao: ApiTokenDao,
     private val apiAccessLogDao: ApiAccessLogDao,
     private val systemUserDao: SystemUserDao
@@ -103,6 +109,18 @@ class ApiService @Inject constructor(
 
                     get("/sync") {
                         handleSyncEmployees(call)
+                    }
+
+                    post("/import") {
+                        handleImportEmployees(call)
+                    }
+
+                    post("/upload-photo") {
+                        handleUploadEmployeePhoto(call)
+                    }
+
+                    post("/upload-cert-photo") {
+                        handleUploadHealthCertPhoto(call)
                     }
                 }
 
@@ -545,6 +563,417 @@ class ApiService @Inject constructor(
     }
 
     /**
+     * 处理批量导入员工
+     */
+    private suspend fun handleImportEmployees(call: ApplicationCall) {
+        val startTime = System.currentTimeMillis()
+        var responseCode = 0
+        var errorMessage: String? = null
+
+        try {
+            val request = call.receive<EmployeeImportRequest>()
+            
+            if (request.employees.isEmpty()) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<EmployeeImportResponse>(responseCode, "导入列表不能为空"))
+                return
+            }
+
+            if (request.employees.size > 100) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<EmployeeImportResponse>(responseCode, "单次导入列表不能超过100条"))
+                return
+            }
+
+            Timber.d("开始导入 ${request.employees.size} 个员工")
+            
+            val details = mutableListOf<EmployeeImportDetail>()
+            var successCount = 0
+            var failedCount = 0
+
+            // 初始化人脸引擎（一次）
+            if (!com.smartcheck.sdk.face.FaceSdk.isInitialized()) {
+                val initRet = com.smartcheck.sdk.face.FaceSdk.init(context)
+                if (initRet != 0) {
+                    Timber.e("人脸引擎初始化失败: ${com.smartcheck.sdk.face.FaceSdk.getLastInitError()}")
+                    call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<EmployeeImportResponse>(ErrorCodes.INTERNAL_ERROR, "人脸引擎初始化失败"))
+                    return
+                }
+            }
+
+            // 检查同批次重复工号
+            val employeeIds = request.employees.map { it.employeeId.trim() }
+            val duplicates = employeeIds.groupBy { it }.filter { it.value.size > 1 }.keys
+            if (duplicates.isNotEmpty()) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<EmployeeImportResponse>(responseCode, "导入列表中存在重复工号: ${duplicates.joinToString()}"))
+                return
+            }
+
+            // 记录已处理的工号（包含数据库中已存在的）
+            val processedIds = mutableSetOf<String>()
+
+            for (item in request.employees) {
+                try {
+                    val employeeId = item.employeeId.trim()
+                    
+                    // 检查是否在同批次中重复
+                    if (employeeId in processedIds) {
+                        details.add(EmployeeImportDetail(
+                            employeeId = employeeId,
+                            status = "failed",
+                            message = "导入列表中工号重复",
+                            userId = null
+                        ))
+                        failedCount++
+                        continue
+                    }
+                    processedIds.add(employeeId)
+
+                    // 检查是否已存在（包括手动注册的员工）
+                    val existingUser = userRepository.getUserByEmployeeId(employeeId).getOrNull()
+                    if (existingUser != null) {
+                        details.add(EmployeeImportDetail(
+                            employeeId = employeeId,
+                            status = "failed",
+                            message = "员工工号已存在",
+                            userId = existingUser.id
+                        ))
+                        failedCount++
+                        continue
+                    }
+
+                    // 创建员工
+                    val user = User(
+                        name = item.name.trim(),
+                        employeeId = employeeId,
+                        idCardNumber = item.idCardNumber.trim(),
+                        healthCertImagePath = "",
+                        healthCertStartDate = item.healthCertStartDate,
+                        healthCertEndDate = item.healthCertEndDate,
+                        isActive = item.isActive,
+                        createdAt = System.currentTimeMillis()
+                    )
+
+                    val userId = userRepository.createUser(user).getOrNull()
+                    if (userId == null || userId <= 0) {
+                        details.add(EmployeeImportDetail(
+                            employeeId = employeeId,
+                            status = "failed",
+                            message = "创建用户失败",
+                            userId = null
+                        ))
+                        failedCount++
+                        continue
+                    }
+
+                    // 处理人脸图片
+                    var faceEmbedding: ByteArray? = null
+                    var faceImagePath: String? = null
+                    
+                    if (!item.faceImageBase64.isNullOrBlank()) {
+                        try {
+                            val imageBytes = android.util.Base64.decode(item.faceImageBase64, android.util.Base64.DEFAULT)
+                            val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                            
+                            if (bitmap != null) {
+                                val faces = com.smartcheck.sdk.face.FaceSdk.detect(bitmap)
+                                if (faces.isNotEmpty()) {
+                                    val feature = com.smartcheck.sdk.face.FaceSdk.extractFeature(bitmap)
+                                    if (feature != null) {
+                                        faceEmbedding = floatArrayToByteArray(feature)
+                                        val faceFileName = "face_emp_${System.currentTimeMillis()}_${userId}.jpg"
+                                        val faceFile = java.io.File(FileUtil.getRecordsDir(context), faceFileName)
+                                        java.io.FileOutputStream(faceFile).use { out ->
+                                            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                                        }
+                                        faceImagePath = faceFileName
+                                    } else {
+                                        Timber.w("无法提取人脸特征: $employeeId")
+                                    }
+                                } else {
+                                    Timber.w("图片中未检测到人脸: $employeeId")
+                                }
+                                bitmap.recycle()
+                            }
+                        } catch (e: Exception) {
+                            Timber.e(e, "处理人脸图片失败: $employeeId")
+                        }
+                    }
+
+                    // 处理健康证图片
+                    var healthCertImagePath: String? = null
+                    if (!item.healthCertImageBase64.isNullOrBlank()) {
+                        try {
+                            val imageBytes = android.util.Base64.decode(item.healthCertImageBase64, android.util.Base64.DEFAULT)
+                            val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                            
+                            if (bitmap != null) {
+                                val certFileName = "cert_emp_${System.currentTimeMillis()}_${userId}.jpg"
+                                val certFile = java.io.File(FileUtil.getRecordsDir(context), certFileName)
+                                java.io.FileOutputStream(certFile).use { out ->
+                                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                                }
+                                healthCertImagePath = certFileName
+                                bitmap.recycle()
+                            }
+                        } catch (e: Exception) {
+                            Timber.e(e, "处理健康证图片失败: $employeeId")
+                        }
+                    }
+
+                    // 保存用户信息
+                    if (faceEmbedding != null || faceImagePath != null || healthCertImagePath != null) {
+                        val updatedUser = user.copy(
+                            id = userId,
+                            faceEmbedding = faceEmbedding,
+                            faceImagePath = faceImagePath,
+                            healthCertImagePath = healthCertImagePath ?: ""
+                        )
+                        userRepository.updateUser(updatedUser)
+                    }
+
+                    details.add(EmployeeImportDetail(
+                        employeeId = employeeId,
+                        status = "success",
+                        message = when {
+                            faceEmbedding != null -> "导入成功（含人脸特征）"
+                            healthCertImagePath != null -> "导入成功（含健康证图片）"
+                            else -> "导入成功"
+                        },
+                        userId = userId
+                    ))
+                    successCount++
+                    Timber.d("导入员工成功: ${item.name}, employeeId=$employeeId, faceEmbedding=${faceEmbedding != null}")
+
+                } catch (e: Exception) {
+                    Timber.e(e, "导入员工失败: ${item.employeeId}")
+                    details.add(EmployeeImportDetail(
+                        employeeId = item.employeeId,
+                        status = "failed",
+                        message = e.message ?: "导入失败",
+                        userId = null
+                    ))
+                    failedCount++
+                }
+            }
+
+            val response = EmployeeImportResponse(
+                total = request.employees.size,
+                success = successCount,
+                failed = failedCount,
+                details = details
+            )
+
+            Timber.d("导入完成: total=${response.total}, success=$successCount, failed=$failedCount")
+            
+            // 刷新人脸特征缓存
+            if (successCount > 0) {
+                try {
+                    faceEngine.refreshUserCache()
+                    Timber.d("人脸特征缓存已刷新")
+                } catch (e: Exception) {
+                    Timber.e(e, "刷新人脸缓存失败")
+                }
+            }
+            
+            call.respond(ApiResponse.success(response))
+
+        } catch (e: Exception) {
+            Timber.e(e, "Import employees failed")
+            responseCode = ErrorCodes.INTERNAL_ERROR
+            errorMessage = e.message
+            call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<EmployeeImportResponse>(ErrorCodes.INTERNAL_ERROR, "导入失败: ${e.message}"))
+        } finally {
+            logAccess(call, "/api/employees/import", "POST", responseCode, errorMessage, System.currentTimeMillis() - startTime)
+        }
+    }
+
+    /**
+     * 处理上传员工照片
+     * 请求格式：{"fileName": "face_001.jpg", "imageBase64": "..."}
+     * 文件名格式：face_{工号}.jpg
+     */
+    private suspend fun handleUploadEmployeePhoto(call: ApplicationCall) {
+        val startTime = System.currentTimeMillis()
+        var responseCode = 0
+        var errorMessage: String? = null
+
+        try {
+            val request = call.receive<PhotoUploadRequest>()
+            
+            val fileNameStr = request.fileName
+            if (fileNameStr.isBlank()) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "文件名不能为空"))
+                return
+            }
+
+            if (!fileNameStr.matches(Regex("^face_[A-Za-z0-9_]+\\.jpg$", RegexOption.IGNORE_CASE))) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "文件名格式错误，应为 face_{工号}.jpg，例如 face_001.jpg"))
+                return
+            }
+
+            if (request.imageBase64.isBlank()) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "图片不能为空"))
+                return
+            }
+
+            val employeeId = fileNameStr.removePrefix("face_").removeSuffix(".jpg").lowercase()
+
+            val user = userRepository.getUserByEmployeeId(employeeId).getOrNull()
+            if (user == null) {
+                responseCode = ErrorCodes.NOT_FOUND
+                call.respond(HttpStatusCode.NotFound, ApiResponse.error<String>(responseCode, "员工工号不存在: $employeeId，请先导入员工信息"))
+                return
+            }
+
+            val imageBytes = android.util.Base64.decode(request.imageBase64, android.util.Base64.DEFAULT)
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+            if (bitmap == null) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "图片格式错误"))
+                return
+            }
+
+            if (!com.smartcheck.sdk.face.FaceSdk.isInitialized()) {
+                val initRet = com.smartcheck.sdk.face.FaceSdk.init(context)
+                if (initRet != 0) {
+                    bitmap.recycle()
+                    Timber.e("人脸引擎初始化失败")
+                    call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<String>(ErrorCodes.INTERNAL_ERROR, "人脸引擎初始化失败"))
+                    return
+                }
+            }
+
+            val faces = com.smartcheck.sdk.face.FaceSdk.detect(bitmap)
+            if (faces.isEmpty()) {
+                bitmap.recycle()
+                Timber.w("图片中未检测到人脸: $employeeId")
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(ErrorCodes.VALIDATION_FAILED, "图片中未检测到人脸"))
+                return
+            }
+
+            val feature = com.smartcheck.sdk.face.FaceSdk.extractFeature(bitmap)
+            if (feature == null) {
+                bitmap.recycle()
+                Timber.w("无法提取人脸特征: $employeeId")
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(ErrorCodes.VALIDATION_FAILED, "无法提取人脸特征"))
+                return
+            }
+
+            val faceEmbedding = floatArrayToByteArray(feature)
+            val savedFileName = "face_emp_${System.currentTimeMillis()}_${user.id}.jpg"
+            val savedFile = java.io.File(FileUtil.getRecordsDir(context), savedFileName)
+            java.io.FileOutputStream(savedFile).use { out ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+            }
+            bitmap.recycle()
+
+            val updatedUser = user.copy(faceEmbedding = faceEmbedding, faceImagePath = savedFileName)
+            userRepository.updateUser(updatedUser)
+            faceEngine.refreshUserCache()
+
+            Timber.d("上传员工照片成功: employeeId=$employeeId, userId=${user.id}")
+
+            call.respond(ApiResponse.success(mapOf(
+                "employeeId" to employeeId,
+                "userId" to user.id,
+                "faceImagePath" to savedFileName,
+                "message" to "上传成功，已提取人脸特征"
+            )))
+
+        } catch (e: Exception) {
+            Timber.e(e, "Upload employee photo failed")
+            responseCode = ErrorCodes.INTERNAL_ERROR
+            errorMessage = e.message
+            call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<String>(ErrorCodes.INTERNAL_ERROR, "上传失败: ${e.message}"))
+        } finally {
+            logAccess(call, "/api/employees/upload-photo", "POST", responseCode, errorMessage, System.currentTimeMillis() - startTime)
+        }
+    }
+
+    /**
+     * 处理上传健康证照片
+     * 请求格式：{"fileName": "cert_001.jpg", "imageBase64": "..."}
+     * 文件名格式：cert_{工号}.jpg
+     */
+    private suspend fun handleUploadHealthCertPhoto(call: ApplicationCall) {
+        val startTime = System.currentTimeMillis()
+        var responseCode = 0
+        var errorMessage: String? = null
+
+        try {
+            val request = call.receive<PhotoUploadRequest>()
+            
+            val fileNameStr = request.fileName
+            if (fileNameStr.isBlank()) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "文件名不能为空"))
+                return
+            }
+
+            if (!fileNameStr.matches(Regex("^cert_[A-Za-z0-9_]+\\.(jpg|jpeg|png)$", RegexOption.IGNORE_CASE))) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "文件名格式错误，应为 cert_{工号}.jpg，例如 cert_001.jpg"))
+                return
+            }
+
+            if (request.imageBase64.isBlank()) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "图片不能为空"))
+                return
+            }
+
+            val employeeId = fileNameStr.removePrefix("cert_").substringBefore(".").lowercase()
+
+            val user = userRepository.getUserByEmployeeId(employeeId).getOrNull()
+            if (user == null) {
+                responseCode = ErrorCodes.NOT_FOUND
+                call.respond(HttpStatusCode.NotFound, ApiResponse.error<String>(responseCode, "员工工号不存在: $employeeId，请先导入员工信息"))
+                return
+            }
+
+            val imageBytes = android.util.Base64.decode(request.imageBase64, android.util.Base64.DEFAULT)
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+            if (bitmap == null) {
+                responseCode = ErrorCodes.INVALID_PARAMS
+                call.respond(HttpStatusCode.BadRequest, ApiResponse.error<String>(responseCode, "图片格式错误"))
+                return
+            }
+
+            val savedFileName = "cert_emp_${System.currentTimeMillis()}_${user.id}.jpg"
+            val savedFile = java.io.File(FileUtil.getRecordsDir(context), savedFileName)
+            java.io.FileOutputStream(savedFile).use { out ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+            }
+            bitmap.recycle()
+
+            val updatedUser = user.copy(healthCertImagePath = savedFileName)
+            userRepository.updateUser(updatedUser)
+
+            Timber.d("上传健康证照片成功: employeeId=$employeeId, userId=${user.id}")
+
+            call.respond(ApiResponse.success(mapOf(
+                "employeeId" to employeeId,
+                "userId" to user.id,
+                "healthCertImagePath" to savedFileName,
+                "message" to "上传成功"
+            )))
+
+        } catch (e: Exception) {
+            Timber.e(e, "Upload health cert photo failed")
+            responseCode = ErrorCodes.INTERNAL_ERROR
+            errorMessage = e.message
+            call.respond(HttpStatusCode.InternalServerError, ApiResponse.error<String>(ErrorCodes.INTERNAL_ERROR, "上传失败: ${e.message}"))
+        } finally {
+            logAccess(call, "/api/employees/upload-cert-photo", "POST", responseCode, errorMessage, System.currentTimeMillis() - startTime)
+        }
+    }
+
+    /**
      * 处理图片下载
      */
     private suspend fun handleGetImage(call: ApplicationCall) {
@@ -923,5 +1352,14 @@ class ApiService @Inject constructor(
             isActive = isActive,
             createdAt = createdAt
         )
+    }
+
+    /**
+     * 将 float 数组转换为 byte 数组
+     */
+    private fun floatArrayToByteArray(feature: FloatArray): ByteArray {
+        val buffer = java.nio.ByteBuffer.allocate(feature.size * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        buffer.asFloatBuffer().put(feature)
+        return buffer.array()
     }
 }

@@ -230,6 +230,60 @@ data class EmployeeResponse(
 )
 
 /**
+ * 员工导入请求
+ */
+@Serializable
+data class EmployeeImportRequest(
+    val employees: List<EmployeeImportItem>
+)
+
+/**
+ * 员工导入项
+ */
+@Serializable
+data class EmployeeImportItem(
+    val name: String,
+    val employeeId: String,
+    val idCardNumber: String = "",
+    val faceImageBase64: String? = null,
+    val healthCertImageBase64: String? = null,
+    val healthCertStartDate: Long? = null,
+    val healthCertEndDate: Long? = null,
+    val isActive: Boolean = true
+)
+
+/**
+ * 员工照片上传请求
+ */
+@Serializable
+data class PhotoUploadRequest(
+    val fileName: String,
+    val imageBase64: String
+)
+
+/**
+ * 员工导入响应
+ */
+@Serializable
+data class EmployeeImportResponse(
+    val total: Int,
+    val success: Int,
+    val failed: Int,
+    val details: List<EmployeeImportDetail>
+)
+
+/**
+ * 员工导入详情
+ */
+@Serializable
+data class EmployeeImportDetail(
+    val employeeId: String,
+    val status: String,
+    val message: String,
+    val userId: Long? = null
+)
+
+/**
  * 导出请求
  */
 @Serializable
