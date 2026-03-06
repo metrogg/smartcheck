@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.smartcheck.app.data.repository.HardwareRepository
 import com.smartcheck.app.data.repository.SettingsRepository
 import com.smartcheck.app.data.upload.RecordUploadReporter
+import com.smartcheck.app.data.upload.CloudRecordService
 import com.smartcheck.app.domain.model.toEntity
 import com.smartcheck.app.domain.model.HandStatus
 import com.smartcheck.app.domain.model.HealthCertStatus
@@ -27,10 +28,12 @@ import com.smartcheck.app.ml.FaceEngine
 import com.smartcheck.app.ml.SeetaFaceEngine
 import com.smartcheck.sdk.face.FaceSdk
 import com.smartcheck.sdk.HandDetector
+import com.smartcheck.app.utils.DeviceInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -57,11 +60,13 @@ class MainViewModel @Inject constructor(
     private val hardwareRepository: HardwareRepository,
     private val voiceService: IVoiceService,
     private val recordUploadReporter: RecordUploadReporter,
+    private val cloudRecordService: CloudRecordService,
     private val settingsRepository: SettingsRepository,
     private val userRepository: IUserRepository,
     private val recordRepository: IRecordRepository,
     private val morningCheckUseCase: MorningCheckUseCase,
-    private val imageStorageUseCase: ImageStorageUseCase
+    private val imageStorageUseCase: ImageStorageUseCase,
+    private val appScope: CoroutineScope
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(UiState())
@@ -576,6 +581,12 @@ class MainViewModel @Inject constructor(
                     }.onFailure { e ->
                         Timber.tag("MainViewModel").e(e, "Failed to upload record")
                     }
+                    
+                    // 上报云端（使用 appScope，不随 ViewModel 销毁而取消）
+                    val deviceSn = "test123" // TODO: 正式环境使用 DeviceInfo.getDeviceId(appContext)
+                    appScope.launch {
+                        cloudRecordService.uploadCheckRecord(savedRecord, deviceSn)
+                    }
                 }.onFailure { e ->
                     Timber.tag("MainViewModel").e(e, "Failed to save record")
                 }
@@ -810,6 +821,12 @@ class MainViewModel @Inject constructor(
                     }
                 } catch (e: Exception) {
                     Timber.tag("MainViewModel").e(e, "Failed to upload record")
+                }
+                
+                // 上报云端（使用 appScope，不随 ViewModel 销毁而取消）
+                val deviceSn = "test123" // TODO: 正式环境使用 DeviceInfo.getDeviceId(appContext)
+                appScope.launch {
+                    cloudRecordService.uploadCheckRecord(savedRecord, deviceSn)
                 }
             } catch (e: Exception) {
                 Timber.tag("MainViewModel").e(e, "Failed to save record")

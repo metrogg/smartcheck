@@ -358,6 +358,54 @@ data class PageStaffRequest(
     val pageSize: Int = 50
 )
 
+/**
+ * 客户接口 - 晨检记录上报请求
+ */
+@Serializable
+data class CloudCheckRecordRequest(
+    @SerialName("blur") val blur: String = "",
+    @SerialName("deviceToken") val deviceToken: String = "",
+    @SerialName("deviceIp") val deviceIp: String = "",
+    @SerialName("device_sn") val deviceSn: String = "",
+    @SerialName("livenessScore") val livenessScore: String = "",
+    @SerialName("livenessType") val livenessType: Int = 1,
+    @SerialName("passType") val passType: Int = 1,
+    @SerialName("personCode") val personCode: String = "",
+    @SerialName("personId") val personId: String = "",
+    @SerialName("personName") val personName: String = "",
+    @SerialName("photo") val photo: String = "",
+    @SerialName("recognitionScore") val recognitionScore: String = "",
+    @SerialName("recognitionType") val recognitionType: Int = 1,
+    @SerialName("timestamp") val timestamp: Long = 0,
+    @SerialName("verificationMode") val verificationMode: Int = 9,
+    @SerialName("temperature") val temperature: String = "",
+    @SerialName("temperatureType") val temperatureType: Int = 0,
+    @SerialName("maskType") val maskType: Int = 1,
+    @SerialName("healthyState") val healthyState: Int = 0,
+    @SerialName("cardNumber") val cardNumber: String = "",
+    @SerialName("qrCode") val qrCode: String = "",
+    @SerialName("idCardNumber") val idCardNumber: String = "",
+    @SerialName("serverVerify") val serverVerify: String = "0",
+    @SerialName("verificationType") val verificationType: Int = 0,
+    @SerialName("result") val result: String = "",
+    @SerialName("handPalmPhoto") val handPalmPhoto: String = "",
+    @SerialName("handBackPhoto") val handBackPhoto: String = ""
+)
+
+/**
+ * 客户接口 - 晨检记录上报响应
+ */
+@Serializable
+data class CloudCheckRecordResponse(
+    @SerialName("statuCode") val statuCode: Int,
+    @SerialName("info") val info: String,
+    @SerialName("data") val data: String? = null
+) {
+    val isSuccess: Boolean get() = statuCode == 200
+    val message: String get() = info
+    val code: Int get() = statuCode
+}
+
 
 object ErrorCodes {
     const val SUCCESS = 0
