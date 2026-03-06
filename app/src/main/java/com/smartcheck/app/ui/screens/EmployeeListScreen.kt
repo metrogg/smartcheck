@@ -23,8 +23,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -57,6 +61,7 @@ fun EmployeeListScreen(
     onNavigateBack: () -> Unit,
     onNavigateEmployeeDetail: (String) -> Unit,
     onNavigateEmployeeNew: () -> Unit,
+    onNavigateCloudImport: () -> Unit,
     viewModel: EmployeeListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -86,13 +91,23 @@ fun EmployeeListScreen(
                     value = uiState.query,
                     onValueChange = { viewModel.setQuery(it) },
                     modifier = Modifier
-                        .width(250.dp)
+                        .width(200.dp)
                         .height(Dimens.InputHeight),
                     singleLine = true,
                     trailingIcon = {
                         Icon(Icons.Default.Search, contentDescription = "搜索")
                     }
                 )
+                Spacer(modifier = Modifier.width(Dimens.PaddingNormal))
+                Button(
+                    onClick = onNavigateCloudImport,
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandGreen),
+                    modifier = Modifier.height(Dimens.InputHeight)
+                ) {
+                    Icon(Icons.Default.Cloud, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("从云端新增", fontSize = Dimens.TextSizeSmall)
+                }
                 Spacer(modifier = Modifier.width(Dimens.PaddingNormal))
                 IconButton(onClick = onNavigateBack) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "返回")
@@ -208,6 +223,30 @@ private fun EmployeeCard(
                     color = MaterialTheme.colorScheme.error,
                     fontSize = Dimens.TextSizeSmall
                 )
+            }
+
+            if (employee.phone.isNotBlank() || employee.position.isNotBlank()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (employee.phone.isNotBlank()) {
+                        Text(
+                            text = "手机：${employee.phone}",
+                            color = Color.Black,
+                            fontSize = Dimens.TextSizeSmall
+                        )
+                    } else if (employee.position.isNotBlank()) {
+                        Text(
+                            text = employee.position,
+                            color = Color.Black,
+                            fontSize = Dimens.TextSizeSmall
+                        )
+                    }
+                }
             }
 
             val imageFile = FileUtil.getRecordImageFile(context, employee.faceImagePath)

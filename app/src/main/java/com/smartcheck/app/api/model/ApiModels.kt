@@ -1,6 +1,7 @@
 package com.smartcheck.app.api.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 /**
  * 通用 API 响应包装
@@ -248,6 +249,10 @@ data class EmployeeImportItem(
     val name: String,
     val employeeId: String,
     val idCardNumber: String = "",
+    val phone: String = "",
+    val position: String = "",
+    val department: String = "",
+    val healthCertCode: String = "",
     val faceImageBase64: String? = null,
     val healthCertImageBase64: String? = null,
     val healthCertStartDate: Long? = null,
@@ -313,6 +318,44 @@ data class DeleteEmployeeResponse(
 data class ClearAllEmployeesResponse(
     val deleted: Boolean,
     val message: String
+)
+
+/**
+ * 云端员工信息响应（客户接口）
+ */
+@Serializable
+data class CloudStaffResponse(
+    @SerialName("PageIndex") val pageIndex: Int,
+    @SerialName("PageSize") val pageSize: Int,
+    @SerialName("Total") val total: Int,
+    @SerialName("IsSuccess") val isSuccess: Boolean,
+    @SerialName("Message") val message: String,
+    @SerialName("DataList") val dataList: List<CloudStaffItem>
+)
+
+/**
+ * 云端员工信息项
+ */
+@Serializable
+data class CloudStaffItem(
+    @SerialName("ThirdKey") val thirdKey: String,
+    @SerialName("PersonName") val personName: String,
+    @SerialName("FaceToFacePicUrl") val faceToFacePicUrl: String = "",
+    @SerialName("Phone") val phone: String = "",
+    @SerialName("Position") val position: String = "",
+    @SerialName("HCCode") val hcCode: String = "",
+    @SerialName("HCStartTime") val hcStartTime: String = "",
+    @SerialName("HCEndTime") val hcEndTime: String = "",
+    @SerialName("HCPicUrl") val hcPicUrl: String = ""
+)
+
+/**
+ * 客户接口 - 员工查询请求
+ */
+@Serializable
+data class PageStaffRequest(
+    val pageIndex: Int = 0,
+    val pageSize: Int = 50
 )
 
 

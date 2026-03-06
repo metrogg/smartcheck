@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 
     @Database(
         entities = [UserEntity::class, RecordEntity::class, ApiTokenEntity::class, ApiAccessLogEntity::class, SystemUserEntity::class],
-        version = 7,
+        version = 8,
         exportSchema = false
     )
 abstract class AppDatabase : RoomDatabase() {
@@ -82,6 +82,19 @@ abstract class AppDatabase : RoomDatabase() {
                     updatedAt INTEGER NOT NULL DEFAULT 0
                 )
             """)
+        }
+
+        val MIGRATION_7_8 = androidx.room.migration.Migration(7, 8) { database ->
+            database.execSQL("ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+            try {
+                database.execSQL("ALTER TABLE users ADD COLUMN position TEXT NOT NULL DEFAULT ''")
+            } catch (e: Exception) { /* column may exist */ }
+            try {
+                database.execSQL("ALTER TABLE users ADD COLUMN department TEXT NOT NULL DEFAULT ''")
+            } catch (e: Exception) { /* column may exist */ }
+            try {
+                database.execSQL("ALTER TABLE users ADD COLUMN healthCertCode TEXT NOT NULL DEFAULT ''")
+            } catch (e: Exception) { /* column may exist */ }
         }
     }
 }

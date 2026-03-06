@@ -143,6 +143,12 @@ dependencies {
     implementation("io.ktor:ktor-server-cors:2.3.7")
     implementation("io.ktor:ktor-server-status-pages:2.3.7")
     
+    // Ktor HTTP Client
+    implementation("io.ktor:ktor-client-core:2.3.7")
+    implementation("io.ktor:ktor-client-cio:2.3.7")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
+    
     // JWT
     implementation("com.auth0:java-jwt:4.4.0") {
         exclude(group = "com.google.guava")

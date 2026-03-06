@@ -5,12 +5,15 @@ data class User(
     val name: String,
     val employeeId: String,
     val idCardNumber: String = "",
+    val phone: String = "",
+    val position: String = "",
+    val department: String = "",
+    val healthCertCode: String = "",
     val faceImagePath: String? = null,
     val faceEmbedding: ByteArray? = null,
     val healthCertImagePath: String = "",
     val healthCertStartDate: Long? = null,
     val healthCertEndDate: Long? = null,
-    val department: String = "",
     val isActive: Boolean = true,
     val createdAt: Long = System.currentTimeMillis()
 ) {

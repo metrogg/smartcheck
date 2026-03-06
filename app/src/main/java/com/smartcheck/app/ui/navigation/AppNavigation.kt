@@ -13,6 +13,7 @@ import com.smartcheck.app.ui.screens.DashboardScreen
 import com.smartcheck.app.ui.screens.EmployeeDetailScreen
 import com.smartcheck.app.ui.screens.EmployeeEnrollScreen
 import com.smartcheck.app.ui.screens.EmployeeListScreen
+import com.smartcheck.app.ui.screens.EmployeeCloudImportScreen
 import com.smartcheck.app.ui.screens.HomeScreen
 import com.smartcheck.app.ui.screens.ReportExportScreen
 import com.smartcheck.app.ui.screens.SettingsScreen
@@ -70,7 +71,14 @@ fun AppNavigation() {
                 onNavigateEmployeeDetail = { employeeId ->
                     navController.navigate("employee_detail/$employeeId")
                 },
-                onNavigateEmployeeNew = { navController.navigate("employee_new") }
+                onNavigateEmployeeNew = { navController.navigate("employee_new") },
+                onNavigateCloudImport = { navController.navigate("employee_cloud_import") }
+            )
+        }
+
+        composable("employee_cloud_import") {
+            EmployeeCloudImportScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
