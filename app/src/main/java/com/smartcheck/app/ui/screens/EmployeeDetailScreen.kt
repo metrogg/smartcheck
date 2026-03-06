@@ -63,6 +63,9 @@ fun EmployeeDetailScreen(
     var name by remember { mutableStateOf("") }
     var employeeId by remember { mutableStateOf("") }
     var idCard by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var position by remember { mutableStateOf("") }
+    var department by remember { mutableStateOf("") }
     var certStart by remember { mutableStateOf<LocalDate?>(null) }
     var certEnd by remember { mutableStateOf<LocalDate?>(null) }
     var healthCertImagePath by remember { mutableStateOf("") }
@@ -77,6 +80,9 @@ fun EmployeeDetailScreen(
         name = value.name
         employeeId = value.employeeId
         idCard = value.idCardNumber
+        phone = value.phone
+        position = value.position
+        department = value.department
         certStart = value.healthCertStartDate?.let { millisToLocalDate(it) }
         certEnd = value.healthCertEndDate?.let { millisToLocalDate(it) }
         healthCertImagePath = value.healthCertImagePath
@@ -158,6 +164,30 @@ fun EmployeeDetailScreen(
                 OutlinedTextField(
                     value = idCard,
                     onValueChange = { idCard = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+            FormRow(label = "手机") {
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+            FormRow(label = "职位") {
+                OutlinedTextField(
+                    value = position,
+                    onValueChange = { position = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+            FormRow(label = "部门") {
+                OutlinedTextField(
+                    value = department,
+                    onValueChange = { department = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -285,6 +315,9 @@ fun EmployeeDetailScreen(
                             name = name,
                             employeeId = employeeId,
                             idCardNumber = idCard,
+                            phone = phone,
+                            position = position,
+                            department = department,
                             healthCertStartDate = certStart?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
                             healthCertEndDate = certEnd?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
                             onSuccess = onNavigateBack
@@ -294,6 +327,9 @@ fun EmployeeDetailScreen(
                             name = name,
                             employeeId = employeeId,
                             idCardNumber = idCard,
+                            phone = phone,
+                            position = position,
+                            department = department,
                             healthCertImagePath = healthCertImagePath,
                             healthCertStartDate = certStart?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(),
                             healthCertEndDate = certEnd?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()

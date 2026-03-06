@@ -55,6 +55,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.smartcheck.app.ui.theme.BrandGreen
 import com.smartcheck.app.utils.DeviceAuth
+import com.smartcheck.app.utils.DeviceInfo
 import com.smartcheck.app.ui.theme.Dimens
 import com.smartcheck.app.viewmodel.AdminAuthViewModel
 import com.smartcheck.app.viewmodel.SettingsViewModel
@@ -88,6 +89,10 @@ fun SettingsScreen(
 
     val currentAccount by authViewModel.account.collectAsState()
     val currentRole by authViewModel.currentRole.collectAsState()
+    
+    val deviceId = remember { DeviceInfo.getDeviceId(context) }
+    val deviceModel = remember { DeviceInfo.getDeviceModel() }
+    val appVersion = remember { DeviceInfo.getAppVersion(context) }
 
     var dialogLabel by remember { mutableStateOf("") }
     var dialogValue by remember { mutableStateOf("") }
@@ -353,6 +358,42 @@ fun SettingsScreen(
                                 color = Color(0xFF6B7280)
                             )
                         }
+                    }
+                }
+
+                // 设备信息
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF3F4F6), RoundedCornerShape(8.dp))
+                        .padding(Dimens.PaddingNormal),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "设备SN",
+                            fontSize = Dimens.TextSizeNormal,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF111827)
+                        )
+                        Text(
+                            text = deviceId,
+                            fontSize = Dimens.TextSizeSmall,
+                            color = Color(0xFF6B7280)
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = deviceModel,
+                            fontSize = Dimens.TextSizeSmall,
+                            color = Color(0xFF6B7280)
+                        )
+                        Text(
+                            text = "v$appVersion",
+                            fontSize = Dimens.TextSizeSmall,
+                            color = Color(0xFF6B7280)
+                        )
                     }
                 }
 

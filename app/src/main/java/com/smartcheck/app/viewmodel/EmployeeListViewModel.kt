@@ -22,6 +22,9 @@ class EmployeeListViewModel @Inject constructor(
     data class EmployeeListItem(
         val id: String,
         val name: String,
+        val phone: String,
+        val position: String,
+        val department: String,
         val daysRemaining: Int,
         val faceImagePath: String?
     )
@@ -54,6 +57,9 @@ class EmployeeListViewModel @Inject constructor(
             EmployeeListItem(
                 id = user.id.toString(),
                 name = user.name,
+                phone = user.phone,
+                position = user.position,
+                department = user.department,
                 daysRemaining = calcRemainingDays(user.healthCertEndDate),
                 faceImagePath = user.faceImagePath
             )
