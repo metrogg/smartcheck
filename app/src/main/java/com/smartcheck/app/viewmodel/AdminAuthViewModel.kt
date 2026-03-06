@@ -21,6 +21,9 @@ class AdminAuthViewModel @Inject constructor(
     private val _account = MutableStateFlow("admin")
     val account: StateFlow<String> = _account.asStateFlow()
 
+    private val _currentRole = MutableStateFlow<String?>(null)
+    val currentRole: StateFlow<String?> = _currentRole.asStateFlow()
+
     init {
         viewModelScope.launch {
             adminAuthService.observeLoginState().collect { _isLoggedIn.value = it }
@@ -30,11 +33,21 @@ class AdminAuthViewModel @Inject constructor(
         }
     }
 
+    fun setCurrentRole(role: String?) {
+        _currentRole.value = role
+    }
+
     fun login(account: String, password: String, onResult: (Result<String>) -> Unit) {
         viewModelScope.launch {
             val result = adminAuthService.login(account, password)
             result.fold(
-                onSuccess = { onResult(Result.success("登录成功")) },
+                onSuccess = { 
+                    // 登录成功后设置角色
+                    val role = if (account == "admin") "admin" else "employee"
+                    _currentRole.value = role
+                    _account.value = account
+                    onResult(Result.success("登录成功")) 
+                },
                 onFailure = { 
                     val errorMsg = it.message ?: "登录失败"
                     onResult(Result.failure(Exception(errorMsg)))
@@ -49,15 +62,22 @@ class AdminAuthViewModel @Inject constructor(
         }
     }
 
-    fun setPassword(newPassword: String) {
+    fun changePassword(currentPassword: String, newPassword: String, onResult: (Result<Unit>) -> Unit) {
         viewModelScope.launch {
-            adminAuthService.changePassword("123456", newPassword)
+            val result = adminAuthService.changePassword(currentPassword, newPassword)
+            result.fold(
+                onSuccess = { onResult(Result.success(Unit)) },
+                onFailure = { 
+                    val errorMsg = it.message ?: "修改失败"
+                    onResult(Result.failure(Exception(errorMsg)))
+                }
+            )
         }
     }
 
-    fun setAccount(newAccount: String) {
+    fun changeAccount(newAccount: String, password: String) {
         viewModelScope.launch {
-            adminAuthService.changeAccount(newAccount, "123456")
+            adminAuthService.changeAccount(newAccount, password)
         }
     }
 }

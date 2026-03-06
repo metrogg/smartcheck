@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -56,8 +57,22 @@ fun AdminLoginScreen(
     val loginTitle by settingsViewModel.loginTitle.collectAsState()
     val loginBackground by settingsViewModel.loginBackground.collectAsState()
     val canteenName by settingsViewModel.canteenName.collectAsState()
+    val context = LocalContext.current
+    
+    val prefs = remember {
+        context.getSharedPreferences("admin_auth", android.content.Context.MODE_PRIVATE)
+    }
+    
     LaunchedEffect(Unit) {
         viewModel.logout()
+        // 加载记住的凭据
+        val rememberedUsername = prefs.getString("remembered_username", null)
+        val rememberedPassword = prefs.getString("remembered_password", null)
+        if (rememberedUsername != null && rememberedPassword != null) {
+            account = rememberedUsername
+            password = rememberedPassword
+            rememberPassword = true
+        }
     }
     LaunchedEffect(storedAccount) {
         if (account.isBlank()) {
@@ -197,7 +212,21 @@ fun AdminLoginScreen(
                 onClick = {
                     viewModel.login(account, password) { result ->
                         result.fold(
-                            onSuccess = { onLoginSuccess() },
+                            onSuccess = { 
+                                // 保存或清除凭据
+                                if (rememberPassword) {
+                                    prefs.edit()
+                                        .putString("remembered_username", account)
+                                        .putString("remembered_password", password)
+                                        .apply()
+                                } else {
+                                    prefs.edit()
+                                        .remove("remembered_username")
+                                        .remove("remembered_password")
+                                        .apply()
+                                }
+                                onLoginSuccess() 
+                            },
                             onFailure = { error = it.message ?: "登录失败" }
                         )
                     }

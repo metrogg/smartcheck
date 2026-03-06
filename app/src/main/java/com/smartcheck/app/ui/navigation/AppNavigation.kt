@@ -115,8 +115,15 @@ fun AppNavigation() {
         }
 
         composable("settings") {
+            val authViewModel: AdminAuthViewModel = hiltViewModel()
             SettingsScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onLogout = {
+                    navController.navigate("login") {
+                        popUpTo("dashboard") { inclusive = true }
+                    }
+                },
+                authViewModel = authViewModel
             )
         }
     }

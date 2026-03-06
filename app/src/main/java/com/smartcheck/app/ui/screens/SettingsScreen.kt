@@ -28,11 +28,16 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +54,7 @@ import coil.compose.AsyncImage
 import com.smartcheck.app.ui.theme.BrandGreen
 import com.smartcheck.app.utils.DeviceAuth
 import com.smartcheck.app.ui.theme.Dimens
+import com.smartcheck.app.viewmodel.AdminAuthViewModel
 import com.smartcheck.app.viewmodel.SettingsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +72,8 @@ import java.util.Locale
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onLogout: () -> Unit = {},
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    authViewModel: AdminAuthViewModel = hiltViewModel()
 ) {
     val adminName by viewModel.adminName.collectAsState()
     val account by viewModel.account.collectAsState()
@@ -76,6 +83,9 @@ fun SettingsScreen(
     val adminAvatar by viewModel.adminAvatar.collectAsState()
     val context = LocalContext.current
 
+    val currentAccount by authViewModel.account.collectAsState()
+    val currentRole by authViewModel.currentRole.collectAsState()
+
     var dialogLabel by remember { mutableStateOf("") }
     var dialogValue by remember { mutableStateOf("") }
     var onDialogConfirm by remember { mutableStateOf<((String) -> Unit)?>(null) }
@@ -83,12 +93,64 @@ fun SettingsScreen(
     var showUpdateLoading by remember { mutableStateOf(false) }
     var showAvatarMenu by remember { mutableStateOf(false) }
     var showBackgroundMenu by remember { mutableStateOf(false) }
+    
+    // 密码修改对话框
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var oldPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var passwordLoading by remember { mutableStateOf(false) }
 
     fun openEdit(label: String, value: String, onConfirm: (String) -> Unit) {
         dialogLabel = label
         dialogValue = value
         onDialogConfirm = onConfirm
         showDialog = true
+    }
+
+    fun showPasswordChangeDialog() {
+        oldPassword = ""
+        newPassword = ""
+        confirmPassword = ""
+        passwordError = null
+        showPasswordDialog = true
+    }
+
+    fun confirmPasswordChange() {
+        passwordError = null
+        if (oldPassword.isBlank()) {
+            passwordError = "请输入原密码"
+            return
+        }
+        if (newPassword.isBlank()) {
+            passwordError = "请输入新密码"
+            return
+        }
+        if (newPassword.length < 6) {
+            passwordError = "新密码长度不能少于6位"
+            return
+        }
+        if (newPassword != confirmPassword) {
+            passwordError = "两次输入的密码不一致"
+            return
+        }
+        
+        passwordLoading = true
+        authViewModel.changePassword(oldPassword, newPassword) { result ->
+            passwordLoading = false
+            result.fold(
+                onSuccess = {
+                    showPasswordDialog = false
+                    oldPassword = ""
+                    newPassword = ""
+                    confirmPassword = ""
+                },
+                onFailure = {
+                    passwordError = it.message ?: "修改失败"
+                }
+            )
+        }
     }
 
     val avatarPicker = rememberLauncherForActivityResult(
@@ -275,20 +337,64 @@ fun SettingsScreen(
                     )
                 }
 
+                // 当前登录用户信息
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF3F4F6), RoundedCornerShape(8.dp))
+                        .padding(Dimens.PaddingNormal),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "当前登录: $currentAccount",
+                            fontSize = Dimens.TextSizeNormal,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF111827)
+                        )
+                        if (currentRole != null) {
+                            Text(
+                                text = "角色: ${if (currentRole == "admin") "管理员" else "员工"}",
+                                fontSize = Dimens.TextSizeSmall,
+                                color = Color(0xFF6B7280)
+                            )
+                        }
+                    }
+                }
+
+                // 退出登录按钮
+                Button(
+                    onClick = {
+                        authViewModel.logout()
+                        CoroutineScope(Dispatchers.Main).launch {
+                            onLogout()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    Text(text = "退出登录", color = Color.White, fontSize = Dimens.TextSizeNormal)
+                }
+
+                Spacer(modifier = Modifier.height(Dimens.PaddingLarge))
+
                 SettingRow(
                     label = "管理员姓名",
                     value = if (adminName.isBlank()) "赵某某" else adminName,
                     onEdit = { openEdit("管理员姓名", adminName) { viewModel.setAdminName(it) } }
                 )
                 SettingRow(
-                    label = "登录账号",
-                    value = account,
-                    onEdit = { openEdit("登录账号", account) { viewModel.setAccount(it) } }
+                    label = "当前账号",
+                    value = currentAccount,
+                    onEdit = null
                 )
                 SettingRow(
-                    label = "登录密码",
-                    value = "......",
-                    onEdit = { openEdit("登录密码", "") { viewModel.setPassword(it) } }
+                    label = "修改密码",
+                    value = "******",
+                    onEdit = { showPasswordChangeDialog() }
                 )
                 SettingRow(
                     label = "食堂名称",
@@ -455,13 +561,81 @@ fun SettingsScreen(
             }
         )
     }
+
+    // 密码修改对话框
+    if (showPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = { showPasswordDialog = false },
+            title = { Text(text = "修改密码") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
+                    OutlinedTextField(
+                        value = oldPassword,
+                        onValueChange = { oldPassword = it; passwordError = null },
+                        label = { Text("原密码") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    OutlinedTextField(
+                        value = newPassword,
+                        onValueChange = { newPassword = it; passwordError = null },
+                        label = { Text("新密码") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it; passwordError = null },
+                        label = { Text("确认新密码") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    if (passwordError != null) {
+                        Text(
+                            text = passwordError ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = Dimens.TextSizeSmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { confirmPasswordChange() },
+                    enabled = !passwordLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandGreen)
+                ) {
+                    if (passwordLoading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
+                    }
+                    Text(text = "确定", color = Color.White)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showPasswordDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5E7EB))
+                ) {
+                    Text(text = "取消", color = Color.Black)
+                }
+            }
+        )
+    }
 }
 
 @Composable
 private fun SettingRow(
     label: String,
     value: String,
-    onEdit: () -> Unit,
+    onEdit: (() -> Unit)? = null,
     preview: String? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -475,12 +649,14 @@ private fun SettingRow(
                 fontSize = Dimens.TextSizeNormal,
                 color = Color(0xFF111827)
             )
-            Text(
-                text = "修改",
-                color = Color(0xFF2563EB),
-                fontSize = Dimens.TextSizeNormal,
-                modifier = Modifier.clickable(onClick = onEdit)
-            )
+            if (onEdit != null) {
+                Text(
+                    text = "修改",
+                    color = Color(0xFF2563EB),
+                    fontSize = Dimens.TextSizeNormal,
+                    modifier = Modifier.clickable(onClick = onEdit)
+                )
+            }
         }
         if (preview != null) {
             Text(
