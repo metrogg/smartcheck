@@ -35,6 +35,9 @@ class SettingsRepository @Inject constructor(
     private val _adminAvatar = MutableStateFlow(prefs.getString(KEY_ADMIN_AVATAR, "") ?: "")
     val adminAvatar: StateFlow<String> = _adminAvatar.asStateFlow()
 
+    private val _deviceSn = MutableStateFlow(prefs.getString(KEY_DEVICE_SN, "") ?: "")
+    val deviceSn: StateFlow<String> = _deviceSn.asStateFlow()
+
     fun setVoiceEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_VOICE_ENABLED, enabled).apply()
         _voiceEnabled.value = enabled
@@ -70,7 +73,14 @@ class SettingsRepository @Inject constructor(
         _adminAvatar.value = value
     }
 
+    fun setDeviceSn(value: String) {
+        prefs.edit().putString(KEY_DEVICE_SN, value).apply()
+        _deviceSn.value = value
+    }
+
     fun isVoiceEnabled(): Boolean = _voiceEnabled.value
+
+    fun getDeviceSn(): String = _deviceSn.value
 
     companion object {
         private const val PREF_NAME = "smartcheck_settings"
@@ -81,5 +91,6 @@ class SettingsRepository @Inject constructor(
         private const val KEY_LOGIN_TITLE = "login_title"
         private const val KEY_LOGIN_BG = "login_background"
         private const val KEY_ADMIN_AVATAR = "admin_avatar"
+        private const val KEY_DEVICE_SN = "device_sn"
     }
 }

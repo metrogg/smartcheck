@@ -44,6 +44,7 @@ class SettingsViewModel @Inject constructor(
     val loginTitle: StateFlow<String> = settingsRepository.loginTitle
     val loginBackground: StateFlow<String> = settingsRepository.loginBackground
     val adminAvatar: StateFlow<String> = settingsRepository.adminAvatar
+    val deviceSn: StateFlow<String> = settingsRepository.deviceSn
 
     fun setVoiceEnabled(enabled: Boolean) {
         settingsRepository.setVoiceEnabled(enabled)
@@ -58,6 +59,8 @@ class SettingsViewModel @Inject constructor(
     fun setLoginBackground(value: String) = settingsRepository.setLoginBackground(value)
 
     fun setAdminAvatar(value: String) = settingsRepository.setAdminAvatar(value)
+
+    fun setDeviceSn(value: String) = settingsRepository.setDeviceSn(value)
 
     fun setAccount(value: String) {
         settingsRepository.setAccount(value)

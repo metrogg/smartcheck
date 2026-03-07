@@ -586,7 +586,7 @@ class MainViewModel @Inject constructor(
                     }
                     
                     // 上报云端（使用 appScope，不随 ViewModel 销毁而取消）
-                    val deviceSn = "test123" // TODO: 正式环境使用 DeviceInfo.getDeviceId(appContext)
+                    val deviceSn = settingsRepository.getDeviceSn().ifEmpty { DeviceInfo.getDeviceId(appContext) }
                     appScope.launch {
                         cloudRecordService.uploadCheckRecord(savedRecord, deviceSn)
                     }
@@ -827,7 +827,7 @@ class MainViewModel @Inject constructor(
                 }
                 
                 // 上报云端（使用 appScope，不随 ViewModel 销毁而取消）
-                val deviceSn = "test123" // TODO: 正式环境使用 DeviceInfo.getDeviceId(appContext)
+                val deviceSn = settingsRepository.getDeviceSn().ifEmpty { DeviceInfo.getDeviceId(appContext) }
                 appScope.launch {
                     cloudRecordService.uploadCheckRecord(savedRecord, deviceSn)
                 }

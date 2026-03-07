@@ -8,6 +8,7 @@ import com.smartcheck.app.api.model.CloudStaffItem
 import com.smartcheck.app.api.model.EmployeeImportItem
 import com.smartcheck.app.domain.model.User
 import com.smartcheck.app.domain.repository.IUserRepository
+import com.smartcheck.app.data.repository.SettingsRepository
 import com.smartcheck.app.domain.usecase.ImageStorageUseCase
 import com.smartcheck.app.ml.FaceEngine
 import com.smartcheck.sdk.face.FaceSdk
@@ -34,7 +35,8 @@ class CloudImportViewModel @Inject constructor(
     private val userRepository: IUserRepository,
     private val httpClient: HttpClient,
     private val imageStorageUseCase: ImageStorageUseCase,
-    private val faceEngine: FaceEngine
+    private val faceEngine: FaceEngine,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     data class CloudEmployeeItem(
@@ -71,6 +73,10 @@ class CloudImportViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    init {
+        _uiState.value = _uiState.value.copy(deviceSn = settingsRepository.getDeviceSn())
+    }
 
     fun setDeviceSn(sn: String) {
         _uiState.value = _uiState.value.copy(deviceSn = sn)

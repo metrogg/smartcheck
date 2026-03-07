@@ -85,6 +85,7 @@ fun SettingsScreen(
     val loginBackground by viewModel.loginBackground.collectAsState()
     val adminAvatar by viewModel.adminAvatar.collectAsState()
     val voiceEnabled by viewModel.voiceEnabled.collectAsState()
+    val deviceSn by viewModel.deviceSn.collectAsState()
     val context = LocalContext.current
 
     val currentAccount by authViewModel.account.collectAsState()
@@ -366,7 +367,12 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xFFF3F4F6), RoundedCornerShape(8.dp))
-                        .padding(Dimens.PaddingNormal),
+                        .padding(Dimens.PaddingNormal)
+                        .clickable {
+                            openEdit("设备SN", deviceSn) { newValue ->
+                                viewModel.setDeviceSn(newValue)
+                            }
+                        },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -378,7 +384,7 @@ fun SettingsScreen(
                             color = Color(0xFF111827)
                         )
                         Text(
-                            text = deviceId,
+                            text = deviceSn.ifEmpty { deviceId },
                             fontSize = Dimens.TextSizeSmall,
                             color = Color(0xFF6B7280)
                         )
