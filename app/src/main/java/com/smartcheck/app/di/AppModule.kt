@@ -210,6 +210,7 @@ object AppModule {
                 json(Json {
                     ignoreUnknownKeys = true
                     isLenient = true
+                    encodeDefaults = true
                 })
             }
             engine {

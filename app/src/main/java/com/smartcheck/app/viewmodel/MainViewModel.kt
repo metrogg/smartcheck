@@ -528,11 +528,12 @@ class MainViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isSubmitting || state.isRecordFinalized) return
         if (state.currentUserId == null) return
-        if (state.state == CheckState.SYMPTOM_CHECKING) return
         if (state.state == CheckState.IDLE) return
 
+        // 允许在任何状态下提交（只要有手心手背照片）
+        // 根据检查结果决定是否通过
         val isPassed = state.state == CheckState.ALL_PASS
-        val isTempNormal = state.state != CheckState.TEMP_FAIL
+        val isTempNormal = state.state != CheckState.TEMP_FAIL && state.state != CheckState.HAND_FAIL
         val isHandNormal = !state.handHasIssue
 
         _uiState.update { it.copy(isSubmitting = true) }

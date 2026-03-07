@@ -329,8 +329,8 @@ data class CloudStaffResponse(
     @SerialName("PageSize") val pageSize: Int,
     @SerialName("Total") val total: Int,
     @SerialName("IsSuccess") val isSuccess: Boolean,
-    @SerialName("Message") val message: String,
-    @SerialName("DataList") val dataList: List<CloudStaffItem>
+    @SerialName("Message") val message: String = "",
+    @SerialName("DataList") val dataList: List<CloudStaffItem> = emptyList()
 )
 
 /**
@@ -355,7 +355,8 @@ data class CloudStaffItem(
 @Serializable
 data class PageStaffRequest(
     val pageIndex: Int = 0,
-    val pageSize: Int = 50
+    val pageSize: Int = 50,
+    @SerialName("yg_sn") val ygSn: String = ""
 )
 
 /**

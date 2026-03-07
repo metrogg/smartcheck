@@ -618,18 +618,10 @@ fun HomeScreen(
 
             Button(
                 onClick = { viewModel.finalizeCheckRecord() },
-                enabled = !uiState.isSubmitting && uiState.state != CheckState.SYMPTOM_CHECKING && !uiState.handHasIssue,
+                enabled = !uiState.isSubmitting && uiState.state != CheckState.SYMPTOM_CHECKING && uiState.handPalmPath != null && uiState.handBackPath != null,
                 modifier = Modifier.fillMaxWidth().height(Dimens.ButtonHeight),
                 colors = ButtonDefaults.buttonColors(containerColor = BrandGreen)
             ) {
-                if (uiState.isSubmitting) {
-                    androidx.compose.material3.CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
-                }
                 Text("提交并上岗")
             }
         }
@@ -736,8 +728,7 @@ fun HomeScreen(
                     Button(
                         onClick = {
                             showHandFailDialog = false
-                            viewModel.finalizeCheckRecord()
-                            viewModel.reset()
+                            // 不退出晨检，让用户可以继续
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) {

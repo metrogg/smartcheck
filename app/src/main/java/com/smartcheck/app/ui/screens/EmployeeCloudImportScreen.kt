@@ -84,6 +84,31 @@ fun EmployeeCloudImportScreen(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+                    Spacer(modifier = Modifier.height(Dimens.PaddingNormal))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingNormal)
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.pageIndex.toString(),
+                            onValueChange = { 
+                                val index = it.toIntOrNull() ?: 0
+                                viewModel.setPageIndex(index.coerceAtLeast(0))
+                            },
+                            label = { Text("页码") },
+                            placeholder = { Text("0") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = uiState.pageSize,
+                            onValueChange = { viewModel.setPageSize(it) },
+                            label = { Text("每页条数(1-100)") },
+                            placeholder = { Text("50") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
                 }
             }
 
