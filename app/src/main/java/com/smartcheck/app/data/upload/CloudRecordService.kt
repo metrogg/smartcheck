@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Base64
 import com.smartcheck.app.api.model.CloudCheckRecordRequest
 import com.smartcheck.app.api.model.CloudCheckRecordResponse
+import com.smartcheck.app.api.model.HandCheckParam
 import com.smartcheck.app.domain.model.Record
 import com.smartcheck.app.utils.FileUtil
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -45,9 +46,20 @@ class CloudRecordService @Inject constructor(
                 Timber.d("Image sizes - face: ${facePhoto.length}, palm: ${handPalmPhoto.length}, back: ${handBackPhoto.length}")
 
                 val temperatureType = if (record.isTempNormal) 0 else 1
-                val result = if (record.isPassed) "1" else "0"
-                val handResult = if (record.isHandNormal) "正常" else "异常"
+                val handResult = when {
+                    record.isHandNormal -> "true"
+                    record.isHandNormal == false -> "false"
+                    else -> "unknown"
+                }
+                // 晨检结果：体温正常 且 手部正常 才通过
+                val result = if (record.isTempNormal && record.isHandNormal) "true" else "false"
                 Timber.d("temperatureType=$temperatureType, result=$result, handResult=$handResult")
+
+                val handCheckParam = HandCheckParam(
+                    result = handResult,
+                    handPalmPhoto = handPalmPhoto,
+                    handBackPhoto = handBackPhoto
+                )
 
                 val request = CloudCheckRecordRequest(
                     deviceIp = deviceIp,
@@ -60,9 +72,7 @@ class CloudRecordService @Inject constructor(
                     temperature = record.temperature.toString(),
                     temperatureType = temperatureType,
                     result = result,
-                    handPalmPhoto = handPalmPhoto,
-                    handBackPhoto = handBackPhoto,
-                    handResult = handResult,
+                    handCheck = handCheckParam,
                     recognitionType = 1,
                     livenessType = 1,
                     maskType = 1,

@@ -360,6 +360,16 @@ data class PageStaffRequest(
 )
 
 /**
+ * 客户接口 - 手部检查参数
+ */
+@Serializable
+data class HandCheckParam(
+    @SerialName("result") val result: String = "",
+    @SerialName("handPalmPhoto") val handPalmPhoto: String = "",
+    @SerialName("handBackPhoto") val handBackPhoto: String = ""
+)
+
+/**
  * 客户接口 - 晨检记录上报请求
  */
 @Serializable
@@ -389,9 +399,7 @@ data class CloudCheckRecordRequest(
     @SerialName("serverVerify") val serverVerify: String = "0",
     @SerialName("verificationType") val verificationType: Int = 0,
     @SerialName("result") val result: String = "",
-    @SerialName("handPalmPhoto") val handPalmPhoto: String = "",
-    @SerialName("handBackPhoto") val handBackPhoto: String = "",
-    @SerialName("handResult") val handResult: String = ""
+    @SerialName("handCheck") val handCheck: HandCheckParam = HandCheckParam()
 )
 
 /**

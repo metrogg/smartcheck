@@ -85,10 +85,6 @@ class EmployeeDetailViewModel @Inject constructor(
         healthCertEndDate: Long?
     ) {
         val current = _user.value ?: return
-        if (healthCertStartDate == null || healthCertEndDate == null) {
-            emitError("请选择健康证起止日期")
-            return
-        }
         if (healthCertStartDate != null && healthCertEndDate != null && healthCertEndDate < healthCertStartDate) {
             emitError("健康证日期范围不合法")
             return

@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
@@ -74,6 +76,7 @@ fun EmployeeDetailScreen(
     var showCertCamera by remember { mutableStateOf(false) }
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(user) {
         val value = user ?: return@LaunchedEffect
@@ -141,10 +144,11 @@ fun EmployeeDetailScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = Dimens.PaddingLarge),
-            verticalArrangement = Arrangement.SpaceEvenly
+                .padding(horizontal = Dimens.PaddingLarge)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            FormRow(label = "姓名") {
+            FormRow(label = "姓名 *") {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -152,7 +156,7 @@ fun EmployeeDetailScreen(
                     singleLine = true
                 )
             }
-            FormRow(label = "编号") {
+            FormRow(label = "编号 *") {
                 OutlinedTextField(
                     value = employeeId,
                     onValueChange = { employeeId = it },
@@ -192,7 +196,7 @@ fun EmployeeDetailScreen(
                     singleLine = true
                 )
             }
-            FormRow(label = "人脸") {
+            FormRow(label = "人脸 *") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
@@ -291,6 +295,14 @@ fun EmployeeDetailScreen(
             }
         }
 
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage!!,
+                color = Color.Red,
+                modifier = Modifier.padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingSmall)
+            )
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -310,6 +322,18 @@ fun EmployeeDetailScreen(
             }
             Button(
                 onClick = {
+                    // 验证必填项
+                    val missing = mutableListOf<String>()
+                    if (name.isBlank()) missing.add("姓名")
+                    if (employeeId.isBlank()) missing.add("编号")
+                    if (faceBitmap == null) missing.add("人脸照片")
+                    
+                    if (missing.isNotEmpty()) {
+                        errorMessage = "请填写必填项：${missing.joinToString("、")}"
+                        return@Button
+                    }
+                    errorMessage = null
+                    
                     if (user == null) {
                         viewModel.saveEmployee(
                             name = name,
