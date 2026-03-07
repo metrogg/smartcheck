@@ -1,0 +1,85 @@
+接口:http://api.qhk12.iyouxin.cn:50082/kitchen/morningCheck/saveData
+
+@ApiModelProperty(value = "抓拍识别模糊度")
+    private Double blur;
+
+    @ApiModelProperty(value = "设备token")
+    private String deviceToken;
+
+    @ApiModelProperty(value = "设备ip地址")
+    private String deviceIp;
+
+    @ApiModelProperty(value = "设备硬件序列号")
+    @JSONField(name = "device_sn")
+    private String deviceSn;
+
+    @ApiModelProperty(value = "活体分数")
+    private Integer livenessScore;
+
+    @ApiModelProperty(value = "活体结果 0：非活体攻击；1：活体；2：未检测")
+    private Integer livenessType;
+
+    @ApiModelProperty(value = "通行类型 0：未通行；1：通行 2：刷脸通过密码错误（复核认证失败）")
+    private Integer passType;
+
+    @ApiModelProperty(value = "人员编号")
+    private String personCode;
+
+    @ApiModelProperty(value = "人员id")
+    private String personId;
+
+    @ApiModelProperty(value = "人员姓名")
+    private String personName;
+
+    @ApiModelProperty(value = "抓拍图片的 base64 code")
+    private String photo;
+
+    @ApiModelProperty(value = "识别分数")
+    private String recognitionScore;
+
+    @ApiModelProperty(value = "识别人员类型 1：员工；2：访客；3：黑名单；4：陌生人；5：未识别")
+    private Integer recognitionType;
+
+    @ApiModelProperty(value = "抓拍时间戳")
+    private Long timestamp;
+
+    @ApiModelProperty(value = "验证类型 0：人脸；1：刷卡；2：人脸及刷卡；3：人脸及密码; 4：远程开门；5：二维码 扫码开门；9：防疫测温；10：人证核验")
+    private Integer verificationMode;
+
+    @ApiModelProperty(value = "人体温度")
+    private BigDecimal temperature;
+
+    @ApiModelProperty(value = "人体高温状态，0：未知，1：正常，2：高温")
+    private Integer temperatureType;
+
+    @ApiModelProperty(value = "口罩状态，0：未知，1：戴口罩，2：未戴口罩")
+    private Integer maskType;
+
+    @ApiModelProperty(value = "健康码状态，0：绿码， 1：黄码，2：红码，3：未知，4：超时")
+    private Integer healthyState;
+
+    @ApiModelProperty(value = "卡号")
+    private String cardNumber;
+
+    @ApiModelProperty(value = "二维码，设备读取到的原始二维码字串")
+    private String qrCode;
+
+    @ApiModelProperty(value = "身份证号码，有密钥时，为身份证号码 AES 加密，密钥需要通过 webapi 下发；无密钥时，身份证号脱敏处理")
+    private String idCardNumber;
+
+    @ApiModelProperty(value = "是否需要服务器鉴权，0：不需要，已鉴权（通行记录），1：需要，设别等待服务器返回鉴权")
+    private String serverVerify;
+
+    @ApiModelProperty(value = "通行记录鉴权类型，0：设备本地鉴权，1：服务器鉴权")
+    private Integer verificationType;
+
+
+
+    @ApiModelProperty(value = "结果")
+    private String result;
+
+    @ApiModelProperty(value = "手掌照片")
+    private String handPalmPhoto;
+
+    @ApiModelProperty(value = "手背照片")
+    private String handBackPhoto;

@@ -1,0 +1,46 @@
+人员信息拉取地址：
+	http://api.qhk12.iyouxin.cn:50082/wosapi/YGCJRobotOpenApi/PageStaff
+接口参数：
+	pageIndex：第几页，pageSize：每页多少条
+header参数：
+yg_sn：设备编码这个设备需要先在我们系统录入。
+
+参数	类型	说明
+ThirdKey
+	String	员工工号
+PersonName
+	String	名字
+FaceToFacePicUrl
+	String	人脸图片地址
+Phone
+	Stirng	手机
+Position
+	String	职位
+HCCode
+	String	健康证编号
+HCStartTime
+	String	有效期开始时间
+HCEndTime
+	String	有效期结束时间
+HCPicUrl
+	String	健康证图片地址
+
+接口返回示例：
+{
+    "PageIndex": 0,
+    "PageSize": 12,
+    "Total": 12,
+    "IsSuccess": true,
+    "Message": "报错信息",
+    "DataList": [
+        {
+            "ThirdKey": "1232",
+            "PersonName": "123123",
+            "FaceToFacePicUrl": "",
+            "Phone": "123213",
+            "Position": "厨师"
+        }
+    ]
+}
+
+
