@@ -69,6 +69,7 @@ class SerialPortManager @Inject constructor() {
             val deviceFile = File(portPath)
             if (!deviceFile.exists()) {
                 Timber.e(TAG, "Serial port device not found: $portPath")
+                Timber.e(TAG, "Available devices: ${getAvailableDevices()}")
                 return false
             }
             

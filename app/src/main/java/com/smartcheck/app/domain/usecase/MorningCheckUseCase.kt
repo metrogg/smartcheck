@@ -42,6 +42,8 @@ class MorningCheckUseCase @Inject constructor(
 
     suspend fun measureTemperatureFlow(readings: Int = 3): Result<TemperatureMeasurementResult> {
         return try {
+            temperatureService.initialize()
+            
             var lastTemp = 0f
             temperatureService.observeTemperature()
                 .take(readings)
