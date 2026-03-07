@@ -283,6 +283,7 @@ class MorningCheckUseCase @Inject constructor(
         return FaceRecognizedResult(
             userId = userId,
             userName = userName,
+            userFaceImagePath = user?.faceImagePath,
             healthCertEndDate = healthCertEndDate,
             healthCertDaysRemaining = remainingDays,
             healthCertStatus = healthCertStatus,
@@ -388,6 +389,7 @@ data class SymptomSubmitResult(
 data class FaceRecognizedResult(
     val userId: Long,
     val userName: String,
+    val userFaceImagePath: String?,
     val healthCertEndDate: Long?,
     val healthCertDaysRemaining: Int?,
     val healthCertStatus: HealthCertStatus,

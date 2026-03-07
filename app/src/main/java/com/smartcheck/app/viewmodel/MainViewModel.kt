@@ -322,7 +322,9 @@ class MainViewModel @Inject constructor(
                     healthCertEndDate = result.healthCertEndDate,
                     healthCertDaysRemaining = result.healthCertDaysRemaining,
                     faceConfidence = result.faceConfidence,
-                    message = result.message
+                    message = result.message,
+                    // 即使健康证过期，也显示已识别用户的人脸图片
+                    faceImagePath = result.userFaceImagePath
                 )
             }
 
