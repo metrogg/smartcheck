@@ -54,8 +54,17 @@ class SeetaFaceEngine @Inject constructor(
             val users = runBlocking { userRepository.observeAllUsers().first() }
             val newCache = ConcurrentHashMap<Long, CachedUser>()
             for (user in users) {
-                val bytes = user.faceEmbedding ?: continue
-                val feature = byteArrayToFloatArray(bytes) ?: continue
+                val bytes = user.faceEmbedding
+                if (bytes == null || bytes.isEmpty()) {
+                    Timber.w("[FaceEngine] 用户 ${user.name} (id=${user.id}) 没有特征，跳过")
+                    continue
+                }
+                val feature = byteArrayToFloatArray(bytes)
+                if (feature == null) {
+                    Timber.w("[FaceEngine] 用户 ${user.name} (id=${user.id}) 特征转换失败")
+                    continue
+                }
+                Timber.d("[FaceEngine] 加载用户 ${user.name} (id=${user.id}), 特征长度=${feature.size}, 前5个值=${feature.take(5).joinToString()}")
                 newCache[user.id] = CachedUser(user.id, user.name, feature)
             }
             userFeatureCache.clear()

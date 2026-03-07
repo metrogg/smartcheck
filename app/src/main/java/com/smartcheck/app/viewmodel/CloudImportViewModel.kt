@@ -288,6 +288,10 @@ class CloudImportViewModel @Inject constructor(
                 }
             }
 
+            // 刷新人脸特征缓存
+            Timber.d("[CloudImport] Refreshing face cache after import")
+            faceEngine.refreshUserCache()
+
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 importResult = ImportResult(
@@ -359,6 +363,8 @@ class CloudImportViewModel @Inject constructor(
             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 ?: return@withContext Result.failure(Exception("Failed to decode image"))
             
+            Timber.d("[CloudImport] Decoded image for $employeeId: ${bitmap.width}x${bitmap.height}")
+            
             // 保存图片
             val imageSaveResult = imageStorageUseCase.saveFaceImage(bitmap)
             if (imageSaveResult.isFailure) {
@@ -367,19 +373,21 @@ class CloudImportViewModel @Inject constructor(
             val faceImagePath = imageSaveResult.getOrNull() ?: ""
             
             // 提取人脸特征
+            Timber.d("[CloudImport] Extracting face embedding for $employeeId...")
             val faceEmbedding = FaceSdk.extractFeature(bitmap)
             
             if (faceEmbedding != null) {
-                Timber.d("Face embedding extracted successfully for employee: $employeeId")
+                Timber.d("[CloudImport] Face embedding extracted successfully for $employeeId, size=${faceEmbedding.size}")
                 // FloatArray 转 ByteArray
                 val embeddingBytes = floatArrayToByteArray(faceEmbedding)
+                Timber.d("[CloudImport] Embedding bytes size for $employeeId: ${embeddingBytes.size}")
                 Result.success(Pair(faceImagePath, embeddingBytes))
             } else {
-                Timber.w("Failed to extract face embedding for employee: $employeeId")
+                Timber.w("[CloudImport] Failed to extract face embedding for $employeeId - 可能图片中没有检测到人脸")
                 Result.success(Pair(faceImagePath, ByteArray(0)))
             }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to save face image for employee: $employeeId")
+            Timber.e(e, "[CloudImport] Failed to save face image for employee: $employeeId")
             Result.failure(e)
         }
     }

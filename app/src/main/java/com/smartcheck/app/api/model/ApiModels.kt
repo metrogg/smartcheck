@@ -390,7 +390,8 @@ data class CloudCheckRecordRequest(
     @SerialName("verificationType") val verificationType: Int = 0,
     @SerialName("result") val result: String = "",
     @SerialName("handPalmPhoto") val handPalmPhoto: String = "",
-    @SerialName("handBackPhoto") val handBackPhoto: String = ""
+    @SerialName("handBackPhoto") val handBackPhoto: String = "",
+    @SerialName("handResult") val handResult: String = ""
 )
 
 /**

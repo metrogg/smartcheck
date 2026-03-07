@@ -33,6 +33,7 @@ class CloudRecordService @Inject constructor(
             try {
                 Timber.d("=== Cloud Record Upload Start ===")
                 Timber.d("Record: personCode=${record.employeeId}, personName=${record.userName}, temp=${record.temperature}, isPassed=${record.isPassed}")
+                Timber.d("Hand paths - palm=${record.handPalmPath}, back=${record.handBackPath}")
                 Timber.d("Device SN: $deviceSn")
                 
                 val deviceIp = getDeviceIp() ?: ""
@@ -45,7 +46,8 @@ class CloudRecordService @Inject constructor(
 
                 val temperatureType = if (record.isTempNormal) 0 else 1
                 val result = if (record.isPassed) "1" else "0"
-                Timber.d("temperatureType=$temperatureType, result=$result")
+                val handResult = if (record.isHandNormal) "正常" else "异常"
+                Timber.d("temperatureType=$temperatureType, result=$result, handResult=$handResult")
 
                 val request = CloudCheckRecordRequest(
                     deviceIp = deviceIp,
@@ -60,6 +62,7 @@ class CloudRecordService @Inject constructor(
                     result = result,
                     handPalmPhoto = handPalmPhoto,
                     handBackPhoto = handBackPhoto,
+                    handResult = handResult,
                     recognitionType = 1,
                     livenessType = 1,
                     maskType = 1,
